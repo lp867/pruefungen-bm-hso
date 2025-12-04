@@ -4,6 +4,7 @@
     <meta charset="UTF-8">
     <title>Prüfungstermine BM HSO</title>
     <meta name="viewport" content="width=device-width, initial-scale=1">
+
     <style>
         :root {
             --bg: #f5f7fb;
@@ -12,222 +13,160 @@
             --accent-soft: #dbeafe;
             --text: #111827;
             --muted: #6b7280;
+            --border: #e5e7eb;
         }
+
         * {
             box-sizing: border-box;
             font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
         }
+
         body {
             margin: 0;
-            padding: 0;
             background: var(--bg);
             color: var(--text);
         }
+
         .container {
-            max-width: 960px;
+            max-width: 800px;
             margin: 0 auto;
             padding: 24px 16px 40px;
         }
+
         header {
             margin-bottom: 24px;
         }
+
         h1 {
-            margin: 0 0 8px;
+            margin: 0 0 6px;
             font-size: 1.8rem;
         }
+
         .subtitle {
-            margin: 0;
             color: var(--muted);
             font-size: 0.95rem;
+            margin: 0;
         }
+
         .card {
             background: var(--card);
             border-radius: 12px;
-            padding: 16px 18px;
+            padding: 18px;
             margin-bottom: 16px;
             box-shadow: 0 8px 20px rgba(15, 23, 42, 0.08);
         }
+
         .card-title {
-            margin: 0 0 8px;
-            font-size: 1.1rem;
-            font-weight: 600;
+            margin: 0 0 10px;
+            font-size: 1.15rem;
         }
-        .card-text {
-            margin: 0 0 12px;
-            font-size: 0.95rem;
+
+        .text {
+            margin: 0 0 10px;
             color: var(--muted);
+            font-size: 0.95rem;
+            line-height: 1.5;
         }
-        .btn-row {
-            display: flex;
-            flex-wrap: wrap;
-            gap: 8px;
-        }
+
         .btn {
-            display: inline-flex;
-            align-items: center;
-            justify-content: center;
-            padding: 8px 14px;
-            border-radius: 999px;
-            border: none;
-            text-decoration: none;
-            font-size: 0.9rem;
-            cursor: pointer;
-            transition: transform 0.1s ease, box-shadow 0.1s ease, background 0.1s ease;
-            white-space: nowrap;
-        }
-        .btn-primary {
+            display: inline-block;
+            margin-top: 8px;
+            padding: 10px 16px;
             background: var(--accent);
             color: white;
+            border-radius: 999px;
+            text-decoration: none;
+            font-size: 0.9rem;
             box-shadow: 0 6px 14px rgba(37, 99, 235, 0.35);
         }
-        .btn-primary:hover {
-            transform: translateY(-1px);
+
+        .btn:hover {
             box-shadow: 0 8px 18px rgba(37, 99, 235, 0.45);
         }
-        .btn-ghost {
-            background: transparent;
-            color: var(--accent);
-            border: 1px solid var(--accent-soft);
+
+        .link-box {
+            margin-top: 12px;
+            padding: 10px;
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            background: #fafafa;
+            font-size: 0.85rem;
+            word-break: break-all;
+            cursor: text;
         }
-        .btn-ghost:hover {
-            background: var(--accent-soft);
-        }
-        table {
-            width: 100%;
-            border-collapse: collapse;
-            font-size: 0.9rem;
-        }
-        thead {
-            background: var(--accent-soft);
-        }
-        th, td {
-            padding: 8px 10px;
-            text-align: left;
-        }
-        th {
-            font-weight: 600;
-            font-size: 0.8rem;
-            text-transform: uppercase;
-            letter-spacing: 0.05em;
-            color: var(--muted);
-        }
-        tbody tr:nth-child(even) {
-            background: #f9fafb;
-        }
-        tbody tr:hover {
-            background: #eef2ff;
-        }
-        .subject-tag {
-            display: inline-block;
-            padding: 2px 8px;
-            border-radius: 999px;
-            font-size: 0.75rem;
-            font-weight: 500;
-        }
-        .mathe { background: #d1fae5; color: #065f46; }
-        .deutsch { background: #fee2e2; color: #991b1b; }
-        .englisch { background: #e0f2fe; color: #1d4ed8; }
-        .info { background: #e5e7eb; color: #111827; }
 
         .hint {
+            margin-top: 6px;
             font-size: 0.8rem;
             color: var(--muted);
-            margin-top: 6px;
         }
 
-        @media (max-width: 640px) {
+        @media (max-width: 600px) {
             h1 { font-size: 1.4rem; }
-            .card { padding: 14px; }
-            th:nth-child(4), td:nth-child(4),
-            th:nth-child(6), td:nth-child(6) {
-                display: none;
-            }
         }
     </style>
 </head>
+
 <body>
 <div class="container">
 
     <header>
         <h1>Prüfungstermine BM HSO</h1>
         <p class="subtitle">
-            Übersicht aller schriftlichen Prüfungen. Änderungen werden zentral im Kalender gepflegt.
+            Zentrale Übersicht über alle Prüfungstermine der Klasse.
         </p>
     </header>
 
-    <!-- Kalender abonnieren -->
+    <!-- Kalender Abschnitt -->
     <section class="card">
         <h2 class="card-title">Kalender abonnieren</h2>
-        <p class="card-text">
-            Füge alle Prüfungstermine direkt zu deinem persönlichen Kalender hinzu
-            (Outlook, Apple Kalender, Google Kalender usw.).
-        </p>
-        <div class="btn-row">
-            <!-- ICS-Link (abonniert den Kalender) -->
-            <a class="btn btn-primary"
-               href="https://calendar.google.com/calendar/ical/86f3a3eb765f4c49fc250489d0a1c9230bdb67dfe31d7a3ce306e5fa1a8b4028@group.calendar.google.com/public/basic.ics"
-               target="_blank" rel="noopener">
-                Prüfungskalender abonnieren
-            </a>
 
-            <!-- Optional: Webansicht des Kalenders (falls du sie nutzen willst) -->
-            <!--
-            <a class="btn btn-ghost"
-               href="HIER_NOCH_DIE_EMBED-ODER-HTML-URL_EINTRAGEN"
-               target="_blank" rel="noopener">
-                Kalender im Browser ansehen
-            </a>
-            -->
+        <p class="text">
+            Alle Prüfungstermine werden zentral verwaltet und laufend aktualisiert.
+            Am zuverlässigsten ist immer der abonnierte Kalender.
+        </p>
+
+        <a class="btn"
+           href="https://calendar.google.com/calendar/ical/86f3a3eb765f4c49fc250489d0a1c9230bdb67dfe31d7a3ce306e5fa1a8b4028@group.calendar.google.com/public/basic.ics"
+           target="_blank" rel="noopener">
+            Prüfungskalender abonnieren
+        </a>
+
+        <div class="hint">
+            Funktioniert mit Outlook, Apple Kalender, Google Kalender und Handy-Kalendern.
         </div>
+    </section>
+
+    <!-- Kopierbarer Link -->
+    <section class="card">
+        <h2 class="card-title">Direkter Kalender-Link (zum Kopieren)</h2>
+
+        <p class="text">
+            Falls der Button nicht funktioniert, kannst du den Kalender auch manuell
+            über diesen Link abonnieren:
+        </p>
+
+        <div class="link-box">
+https://calendar.google.com/calendar/ical/86f3a3eb765f4c49fc250489d0a1c9230bdb67dfe31d7a3ce306e5fa1a8b4028@group.calendar.google.com/public/basic.ics
+        </div>
+
         <p class="hint">
-            Auf dem Handy öffnet sich je nach Gerät eine Kalender-App, die fragt, ob der Kalender abonniert werden soll.
+            Tipp: Anklicken → Strg+C (oder lange drücken auf dem Handy).
         </p>
     </section>
 
-    <!-- Tabellenübersicht -->
+    <!-- Infotext -->
     <section class="card">
-        <h2 class="card-title">Nächste Prüfungen (Tabellenübersicht)</h2>
-        <p class="card-text">
-            Diese Tabelle kannst du bei Bedarf manuell aktualisieren, damit sie mit dem Kalender übereinstimmt.
+        <h2 class="card-title">Hinweise</h2>
+
+        <p class="text">
+            Änderungen an den Terminen können nur von mir oder von mir
+            freigegebenen Personen vorgenommen werden.
         </p>
 
-        <table>
-            <thead>
-            <tr>
-                <th>Datum</th>
-                <th>Fach</th>
-                <th>Thema</th>
-                <th>Zeit</th>
-                <th>Raum</th>
-                <th>Lehrer:in</th>
-                <th>Bemerkungen</th>
-            </tr>
-            </thead>
-            <tbody>
-            <!-- Beispielzeilen – durch echte Prüfungen ersetzen -->
-            <tr>
-                <td>15.01.2026</td>
-                <td><span class="subject-tag mathe">Mathematik</span></td>
-                <td>Quadratische Funktionen</td>
-                <td>08:15 – 09:00</td>
-                <td>310</td>
-                <td>Oberholzer</td>
-                <td>Ohne Taschenrechner</td>
-            </tr>
-            <tr>
-                <td>22.01.2026</td>
-                <td><span class="subject-tag deutsch">Deutsch</span></td>
-                <td>Erörterung</td>
-                <td>09:10 – 10:00</td>
-                <td>312</td>
-                <td>Müller</td>
-                <td>1 A4-Spick erlaubt</td>
-            </tr>
-            </tbody>
-        </table>
-
-        <p class="hint">
-            Neue Prüfungen: zuerst im Google Kalender eintragen, dann diese Tabelle anpassen.
+        <p class="text">
+            Bitte überprüft den Kalender regelmässig, insbesondere vor Prüfungswochen.
+            Bei Fehlern oder Unklarheiten meldet euch direkt bei mir (Elias).
         </p>
     </section>
 
