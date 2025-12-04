@@ -1,186 +1,203 @@
 <!DOCTYPE html>
 <html lang="de">
 <head>
-    <meta charset="UTF-8">
-    <title>Prüfungstermine BM HSO</title>
-    <meta name="viewport" content="width=device-width, initial-scale=1">
+<meta charset="UTF-8">
+<title>Prüfungstermine BM HSO</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
 
-    <style>
-        :root {
-            --bg: #f5f7fb;
-            --card: #ffffff;
-            --accent: #2563eb;
-            --accent-soft: #dbeafe;
-            --text: #111827;
-            --muted: #6b7280;
-            --border: #e5e7eb;
-        }
+<style>
+:root {
+    --bg:#f5f7fb;
+    --card:#ffffff;
+    --accent:#2563eb;
+    --accent-soft:#dbeafe;
+    --text:#111827;
+    --muted:#6b7280;
+    --border:#e5e7eb;
+    --ok:#16a34a;
+}
 
-        * {
-            box-sizing: border-box;
-            font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-        }
+* {
+    box-sizing:border-box;
+    font-family:system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
+}
 
-        body {
-            margin: 0;
-            background: var(--bg);
-            color: var(--text);
-        }
+body {
+    margin:0;
+    background:var(--bg);
+    color:var(--text);
+}
 
-        .container {
-            max-width: 800px;
-            margin: 0 auto;
-            padding: 24px 16px 40px;
-        }
+.container {
+    max-width:800px;
+    margin:auto;
+    padding:24px 16px 40px;
+}
 
-        header {
-            margin-bottom: 24px;
-        }
+header {
+    margin-bottom:24px;
+}
 
-        h1 {
-            margin: 0 0 6px;
-            font-size: 1.8rem;
-        }
+h1 {
+    margin:0 0 6px;
+    font-size:1.8rem;
+}
 
-        .subtitle {
-            margin: 0;
-            color: var(--muted);
-            font-size: 0.95rem;
-        }
+.subtitle {
+    color:var(--muted);
+    font-size:0.95rem;
+}
 
-        .card {
-            background: var(--card);
-            border-radius: 12px;
-            padding: 18px;
-            margin-bottom: 16px;
-            box-shadow: 0 8px 20px rgba(15, 23, 42, 0.08);
-        }
+.card {
+    background:var(--card);
+    border-radius:12px;
+    padding:18px;
+    margin-bottom:16px;
+    box-shadow:0 8px 20px rgba(15,23,42,.08);
+}
 
-        .card-title {
-            margin: 0 0 10px;
-            font-size: 1.15rem;
-        }
+.card-title {
+    margin:0 0 10px;
+    font-size:1.15rem;
+}
 
-        .text {
-            margin: 0 0 10px;
-            font-size: 0.95rem;
-            color: var(--muted);
-            line-height: 1.5;
-        }
+.text {
+    margin:0 0 10px;
+    font-size:.95rem;
+    color:var(--muted);
+    line-height:1.5;
+}
 
-        .btn {
-            display: inline-block;
-            margin-top: 8px;
-            padding: 10px 18px;
-            background: var(--accent);
-            color: white;
-            border-radius: 999px;
-            text-decoration: none;
-            font-size: 0.9rem;
-            box-shadow: 0 6px 14px rgba(37, 99, 235, 0.35);
-        }
+.btn {
+    display:inline-block;
+    margin-top:6px;
+    padding:10px 18px;
+    background:var(--accent);
+    color:#fff;
+    border-radius:999px;
+    text-decoration:none;
+    font-size:.9rem;
+    cursor:pointer;
+    border:none;
+    box-shadow:0 6px 14px rgba(37,99,235,.35);
+}
 
-        .btn:hover {
-            box-shadow: 0 8px 18px rgba(37, 99, 235, 0.45);
-        }
+.btn:hover {
+    box-shadow:0 8px 18px rgba(37,99,235,.45);
+}
 
-        .link-box {
-            margin-top: 10px;
-            padding: 10px;
-            border: 1px solid var(--border);
-            border-radius: 8px;
-            background: #fafafa;
-            font-size: 0.85rem;
-            word-break: break-all;
-            cursor: text;
-        }
+.copied {
+    color:var(--ok);
+    font-size:.85rem;
+    margin-top:6px;
+    display:none;
+}
 
-        .hint {
-            margin-top: 6px;
-            font-size: 0.8rem;
-            color: var(--muted);
-        }
+.link-box {
+    margin-top:10px;
+    padding:10px;
+    border:1px solid var(--border);
+    border-radius:8px;
+    background:#fafafa;
+    font-size:.85rem;
+    word-break:break-all;
+    cursor:text;
+}
 
-        @media (max-width: 600px) {
-            h1 { font-size: 1.4rem; }
-        }
-    </style>
+.hint {
+    margin-top:6px;
+    font-size:.8rem;
+    color:var(--muted);
+}
+</style>
 </head>
 
 <body>
 <div class="container">
 
-    <header>
-        <h1>Prüfungstermine BM HSO</h1>
-        <p class="subtitle">
-            Zentrale Übersicht über alle Prüfungstermine der Klasse.
-        </p>
-    </header>
+<header>
+    <h1>Prüfungstermine BM HSO</h1>
+    <p class="subtitle">
+        Zentrale Übersicht über alle Prüfungstermine der Klasse.
+    </p>
+</header>
 
-    <!-- KALENDER -->
-    <section class="card">
-        <h2 class="card-title">Kalender abonnieren</h2>
+<!-- KALENDER -->
+<section class="card">
+    <h2 class="card-title">Kalender-Link kopieren</h2>
 
-        <p class="text">
-            Alle Prüfungstermine werden zentral verwaltet und laufend aktualisiert.
-            Am zuverlässigsten ist immer der abonnierte Kalender.
-        </p>
+    <p class="text">
+        Der Prüfungskalender kann in jede gängige Kalender-App eingefügt werden
+        (Outlook, Apple Kalender, Google Kalender, Handy).
+    </p>
 
-        <a class="btn"
-           href="https://calendar.google.com/calendar/ical/86f3a3eb765f4c49fc250489d0a1c9230bdb67dfe31d7a3ce306e5fa1a8b4028@group.calendar.google.com/public/basic.ics"
-           target="_blank" rel="noopener">
-           Prüfungskalender abonnieren
-        </a>
+    <button class="btn" onclick="copyCalendarLink()">
+        Kalender-Link kopieren
+    </button>
 
-        <p class="hint">
-            Funktioniert mit Outlook, Apple Kalender, Google Kalender und Handy-Kalendern.
-        </p>
-    </section>
+    <div id="copiedText" class="copied">
+        ✅ Link wurde in die Zwischenablage kopiert
+    </div>
 
-    <!-- TUTORIAL -->
-    <section class="card">
-        <h2 class="card-title">Kurzanleitung</h2>
+    <p class="hint">
+        Anschliessend in der Kalender-App „Kalender aus URL abonnieren“ wählen.
+    </p>
+</section>
 
-        <p class="text">
-            <strong>So fügst du den Prüfungskalender zu deinem eigenen Kalender hinzu:</strong>
-        </p>
+<!-- TUTORIAL -->
+<section class="card">
+    <h2 class="card-title">Kurzanleitung</h2>
 
-        <p class="text">
-            1) Klicke oben auf „Prüfungskalender abonnieren“. <br>
-            2) Bestätige in deiner Kalender-App. <br>
-            3) Fertig – alle Prüfungen erscheinen automatisch.
-        </p>
+    <p class="text">
+        <strong>So fügst du den Prüfungskalender hinzu:</strong>
+    </p>
 
-        <p class="text">
-            Falls der Button nicht funktioniert, kannst du den Kalender auch manuell
-            über den folgenden Link abonnieren:
-        </p>
+    <p class="text">
+        1) Klicke auf „Kalender-Link kopieren“. <br>
+        2) Öffne deine Kalender-App. <br>
+        3) „Kalender aus URL / Internetkalender abonnieren“ wählen. <br>
+        4) Link einfügen → fertig.
+    </p>
 
-        <div class="link-box">
+    <p class="text">
+        Alternativ kannst du den Link auch manuell kopieren:
+    </p>
+
+    <div class="link-box" id="calendarLink">
 https://calendar.google.com/calendar/ical/86f3a3eb765f4c49fc250489d0a1c9230bdb67dfe31d7a3ce306e5fa1a8b4028@group.calendar.google.com/public/basic.ics
-        </div>
+    </div>
+</section>
 
-        <p class="hint">
-            Tipp: Anklicken → Strg+C (oder lange drücken auf dem Handy).
-        </p>
-    </section>
+<!-- HINWEISE -->
+<section class="card">
+    <h2 class="card-title">Hinweise</h2>
 
-    <!-- HINWEISE -->
-    <section class="card">
-        <h2 class="card-title">Hinweise</h2>
+    <p class="text">
+        Änderungen an den Terminen können nur von mir oder von mir freigegebenen
+        Personen vorgenommen werden.
+    </p>
 
-        <p class="text">
-            Änderungen an den Prüfungsterminen können nur von mir
-            oder von mir freigegebenen Personen vorgenommen werden.
-        </p>
-
-        <p class="text">
-            Bitte überprüft den Kalender regelmässig, insbesondere
-            vor Prüfungswochen. Bei Fragen oder Fehlern melde dich
-            direkt bei mir (Elias).
-        </p>
-    </section>
+    <p class="text">
+        Bitte überprüft den Kalender regelmässig, insbesondere vor Prüfungswochen.
+    </p>
+</section>
 
 </div>
+
+<script>
+const calendarLink =
+"https://calendar.google.com/calendar/ical/86f3a3eb765f4c49fc250489d0a1c9230bdb67dfe31d7a3ce306e5fa1a8b4028@group.calendar.google.com/public/basic.ics";
+
+function copyCalendarLink() {
+    navigator.clipboard.writeText(calendarLink).then(() => {
+        const msg = document.getElementById("copiedText");
+        msg.style.display = "block";
+        setTimeout(() => {
+            msg.style.display = "none";
+        }, 2500);
+    });
+}
+</script>
+
 </body>
 </html>
