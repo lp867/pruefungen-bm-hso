@@ -15,6 +15,9 @@
     --muted:#6b7280;
     --border:#e5e7eb;
     --ok:#16a34a;
+    --warn-bg:#fef2f2;
+    --warn-border:#fecaca;
+    --warn-text:#b91c1c;
 }
 
 * {
@@ -109,6 +112,28 @@ h1 {
     font-size:.8rem;
     color:var(--muted);
 }
+
+.warn-box {
+    border-radius:8px;
+    border:1px solid var(--warn-border);
+    background:var(--warn-bg);
+    padding:10px 12px;
+    color:var(--warn-text);
+    font-size:.9rem;
+}
+
+.warn-box ul {
+    margin:6px 0 0;
+    padding-left:18px;
+}
+
+.warn-box li {
+    margin-bottom:2px;
+}
+
+@media (max-width: 600px) {
+    h1 { font-size:1.4rem; }
+}
 </style>
 </head>
 
@@ -122,7 +147,7 @@ h1 {
     </p>
 </header>
 
-<!-- KALENDER -->
+<!-- KALENDER-LINK KOPIEREN -->
 <section class="card">
     <h2 class="card-title">Kalender-Link kopieren</h2>
 
@@ -140,7 +165,7 @@ h1 {
     </div>
 
     <p class="hint">
-        Anschliessend in der Kalender-App „Kalender aus URL abonnieren“ wählen.
+        Anschliessend in der Kalender-App „Kalender aus URL / Internetkalender abonnieren“ wählen.
     </p>
 </section>
 
@@ -168,13 +193,21 @@ https://calendar.google.com/calendar/ical/86f3a3eb765f4c49fc250489d0a1c9230bdb67
     </div>
 </section>
 
+<!-- KONFLIKT-WARNUNGEN -->
+<section class="card">
+    <h2 class="card-title">Prüfungs-Konflikte</h2>
+    <div id="conflictContent" class="text">
+        Lade Konfliktübersicht…
+    </div>
+</section>
+
 <!-- HINWEISE -->
 <section class="card">
     <h2 class="card-title">Hinweise</h2>
 
     <p class="text">
-        Änderungen an den Terminen können nur von mir oder von mir freigegebenen
-        Personen vorgenommen werden.
+        Änderungen an den Terminen können nur von mir oder von mir
+        freigegebenen Personen vorgenommen werden.
     </p>
 
     <p class="text">
@@ -185,8 +218,12 @@ https://calendar.google.com/calendar/ical/86f3a3eb765f4c49fc250489d0a1c9230bdb67
 </div>
 
 <script>
+// ICS-Link zum Kopieren (gleich wie im Text)
 const calendarLink =
 "https://calendar.google.com/calendar/ical/86f3a3eb765f4c49fc250489d0a1c9230bdb67dfe31d7a3ce306e5fa1a8b4028@group.calendar.google.com/public/basic.ics";
+
+// Google-Apps-Script-Web-App-URL für Konflikte
+const conflictsApiUrl = "https://script.google.com/macros/s/AKfycbzujGr4CY4u1QvpITnxpfBRs5wqb5gqZ3l6zGWsp8KW99vXFE1MdZdqJ1GP4RqZG07MSw/exec";
 
 function copyCalendarLink() {
     navigator.clipboard.writeText(calendarLink).then(() => {
@@ -195,7 +232,70 @@ function copyCalendarLink() {
         setTimeout(() => {
             msg.style.display = "none";
         }, 2500);
+    }).catch(() => {
+        alert("Kopieren nicht möglich. Bitte den Link unten manuell markieren und kopieren.");
     });
+}
+
+// Konflikte laden und anzeigen
+document.addEventListener("DOMContentLoaded", () => {
+    loadConflicts();
+});
+
+function loadConflicts() {
+    const container = document.getElementById("conflictContent");
+
+    if (!conflictsApiUrl) {
+        container.textContent = "Konfliktprüfungsauswertung ist noch nicht konfiguriert.";
+        return;
+    }
+
+    fetch(conflictsApiUrl)
+        .then(resp => resp.json())
+        .then(data => {
+            if (!data || !data.events) {
+                container.textContent = "Keine Daten verfügbar.";
+                return;
+            }
+
+            const byDate = {};
+            data.events.forEach(ev => {
+                if (!byDate[ev.date]) byDate[ev.date] = [];
+                byDate[ev.date].push(ev);
+            });
+
+            const entries = Object.entries(byDate)
+                .filter(([date, list]) => list.length >= 2)
+                .sort(([d1], [d2]) => d1.localeCompare(d2));
+
+            if (entries.length === 0) {
+                container.textContent = "Aktuell sind keine Tage mit mehreren Prüfungen eingetragen.";
+                return;
+            }
+
+            let html = '<div class="warn-box">';
+            html += '<strong>⚠ Achtung:</strong> An folgenden Tagen sind mehrere Prüfungen geplant:<br>';
+            html += '<ul>';
+
+            entries.forEach(([date, list]) => {
+                const dispDate = formatDateCH(date);
+                const titles = list.map(ev => ev.title).join(" / ");
+                html += `<li><strong>${dispDate}:</strong> ${titles}</li>`;
+            });
+
+            html += '</ul></div>';
+            container.innerHTML = html;
+        })
+        .catch(err => {
+            console.error(err);
+            container.textContent = "Konfliktübersicht konnte nicht geladen werden.";
+        });
+}
+
+function formatDateCH(isoDate) {
+    const parts = isoDate.split("-");
+    if (parts.length !== 3) return isoDate;
+    return parts[2] + "." + parts[1] + "." + parts[0];
 }
 </script>
 
