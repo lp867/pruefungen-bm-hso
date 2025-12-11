@@ -10,43 +10,19 @@
     --bg:#f5f7fb;
     --card:#ffffff;
     --accent:#2563eb;
-    --accent-soft:#dbeafe;
     --text:#111827;
     --muted:#6b7280;
     --border:#e5e7eb;
     --ok:#16a34a;
 }
 
-* {
-    box-sizing:border-box;
-    font-family:system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
-}
+* { box-sizing:border-box; font-family:system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif; }
+body { margin:0; background:var(--bg); color:var(--text); }
+.container { max-width:800px; margin:auto; padding:24px 16px 40px; }
 
-body {
-    margin:0;
-    background:var(--bg);
-    color:var(--text);
-}
-
-.container {
-    max-width:800px;
-    margin:auto;
-    padding:24px 16px 40px;
-}
-
-header {
-    margin-bottom:24px;
-}
-
-h1 {
-    margin:0 0 6px;
-    font-size:1.8rem;
-}
-
-.subtitle {
-    color:var(--muted);
-    font-size:0.95rem;
-}
+header { margin-bottom:24px; }
+h1 { margin:0 0 6px; font-size:1.8rem; }
+.subtitle { color:var(--muted); font-size:0.95rem; }
 
 .card {
     background:var(--card);
@@ -56,17 +32,8 @@ h1 {
     box-shadow:0 8px 20px rgba(15,23,42,.08);
 }
 
-.card-title {
-    margin:0 0 10px;
-    font-size:1.15rem;
-}
-
-.text {
-    margin:0 0 10px;
-    font-size:.95rem;
-    color:var(--muted);
-    line-height:1.5;
-}
+.card-title { margin:0 0 10px; font-size:1.15rem; }
+.text { margin:0 0 10px; font-size:.95rem; color:var(--muted); line-height:1.5; }
 
 .btn {
     display:inline-block;
@@ -76,53 +43,23 @@ h1 {
     color:#fff;
     border-radius:999px;
     text-decoration:none;
-    font-size:.9rem;
     cursor:pointer;
+    font-size:.9rem;
     border:none;
-    box-shadow:0 6px 14px rgba(37,99,235,.35);
 }
 
-.btn:hover {
-    box-shadow:0 8px 18px rgba(37,99,235,.45);
-}
-
-.copied {
-    color:var(--ok);
-    font-size:.85rem;
-    margin-top:6px;
-    display:none;
-}
+.copied { color:var(--ok); font-size:.85rem; margin-top:6px; display:none; }
 
 .link-box {
-    margin-top:10px;
-    padding:10px;
-    border:1px solid var(--border);
-    border-radius:8px;
-    background:#fafafa;
-    font-size:.85rem;
+    margin-top:10px; padding:10px;
+    border:1px solid var(--border); border-radius:8px;
+    background:#fafafa; font-size:.85rem;
     word-break:break-all;
-    cursor:text;
 }
 
-.hint {
-    margin-top:6px;
-    font-size:.8rem;
-    color:var(--muted);
-}
+.link-inline { color:var(--accent); text-decoration:none; font-weight:500; }
+.link-inline:hover { text-decoration:underline; }
 
-.link-inline {
-    color:var(--accent);
-    text-decoration:none;
-    font-weight:500;
-}
-
-.link-inline:hover {
-    text-decoration:underline;
-}
-
-@media (max-width: 600px) {
-    h1 { font-size:1.4rem; }
-}
 </style>
 </head>
 
@@ -131,50 +68,60 @@ h1 {
 
 <header>
     <h1>Prüfungstermine BM HSO</h1>
-    <p class="subtitle">
-        Zentrale Übersicht über alle Prüfungstermine der Klasse.
-    </p>
+    <p class="subtitle">Zentrale Übersicht über alle Prüfungstermine der Klasse.</p>
 </header>
 
-<!-- KALENDER-LINK KOPIEREN -->
+<!-- 🔥 1) Komplette Prüfungs-Liste -->
 <section class="card">
-    <h2 class="card-title">Kalender-Link kopieren</h2>
+    <h2 class="card-title">Kommende Prüfungen (Liste)</h2>
+    <p class="text">Diese Liste wird automatisch aus dem Prüfungskalender geladen.</p>
+
+    <div style="border-radius:8px;overflow:hidden;border:1px solid var(--border);">
+        <iframe
+            src="https://calendar.google.com/calendar/embed?src=86f3a3eb765f4c49fc250489d0a1c9230bdb67dfe31d7a3ce306e5fa1a8b4028%40group.calendar.google.com&mode=AGENDA&showTitle=0&showPrint=0&showTabs=0&showCalendars=0&showNav=0&ctz=Europe/Zurich"
+            style="border:0;width:100%;height:400px;" loading="lazy">
+        </iframe>
+    </div>
+</section>
+
+<!-- 🔥 2) Konfliktübersicht -->
+<section class="card">
+    <h2 class="card-title">Prüfungs-Konflikte</h2>
 
     <p class="text">
-        Der Prüfungskalender kann in jede gängige Kalender-App eingefügt werden
-        (Outlook, Apple Kalender, Google Kalender, Handy).
+        Zeigt automatisch alle Tage mit mehreren Prüfungen an.
     </p>
 
-    <button class="btn" onclick="copyCalendarLink()">
-        Kalender-Link kopieren
-    </button>
-
-    <div id="copiedText" class="copied">
-        ✅ Link wurde in die Zwischenablage kopiert
-    </div>
-
-    <p class="hint">
-        Anschliessend in der Kalender-App „Kalender aus URL / Internetkalender abonnieren“ wählen.
+    <p class="text">
+        <a class="link-inline" target="_blank"
+           href="https://script.google.com/macros/s/AKfycbxd9pX-fPYpQuLvXeKpEaf-45xRBOwJY1q4t41-FToqTKgZcZPHv9GO_ArfyU0j0bO9cA/exec">
+           🔍 Konfliktübersicht öffnen
+        </a>
     </p>
 </section>
 
-<!-- KURZANLEITUNG -->
+<!-- 🔥 3) Kalender-Link kopieren -->
+<section class="card">
+    <h2 class="card-title">Kalender-Link kopieren</h2>
+
+    <p class="text">Mit diesem Button kannst du den Prüfungskalender sofort kopieren.</p>
+
+    <button class="btn" onclick="copyCalendarLink()">Kalender-Link kopieren</button>
+
+    <div id="copiedText" class="copied">✅ Link wurde kopiert</div>
+
+    <p class="hint">Diesen Link in deiner Kalender-App als „Internetkalender“ einfügen.</p>
+</section>
+
+<!-- 🔥 4) Anleitung -->
 <section class="card">
     <h2 class="card-title">Kurzanleitung</h2>
 
     <p class="text">
-        <strong>So fügst du den Prüfungskalender hinzu:</strong>
-    </p>
-
-    <p class="text">
-        1) Klicke auf „Kalender-Link kopieren“. <br>
-        2) Öffne deine Kalender-App. <br>
-        3) „Kalender aus URL / Internetkalender abonnieren“ wählen. <br>
-        4) Link einfügen → fertig.
-    </p>
-
-    <p class="text">
-        Alternativ kannst du den Link auch manuell kopieren:
+        1) Button drücken <br>
+        2) Kalender-App öffnen <br>
+        3) „Kalender aus URL“ auswählen <br>
+        4) Einfügen → fertig
     </p>
 
     <div class="link-box">
@@ -182,65 +129,17 @@ https://calendar.google.com/calendar/ical/86f3a3eb765f4c49fc250489d0a1c9230bdb67
     </div>
 </section>
 
-<!-- KOMMENDE PRÜFUNGEN (AGENDA-LISTE) -->
-<section class="card">
-    <h2 class="card-title">Kommende Prüfungen (Liste)</h2>
-
-    <p class="text">
-        Die folgende Liste wird direkt aus dem Prüfungskalender geladen
-        und zeigt alle kommenden Prüfungen (Agenda-Ansicht).
-    </p>
-
-    <div style="border-radius:8px;overflow:hidden;border:1px solid var(--border);background:#f9fafb;">
-        <iframe
-            src="https://calendar.google.com/calendar/embed?src=86f3a3eb765f4c49fc250489d0a1c9230bdb67dfe31d7a3ce306e5fa1a8b4028%40group.calendar.google.com&mode=AGENDA&showTitle=0&showPrint=0&showTabs=0&showCalendars=0&showNav=0&ctz=Europe/Zurich"
-            style="border:0;width:100%;height:400px;"
-            loading="lazy">
-        </iframe>
-    </div>
-</section>
-
-<!-- PRÜFUNGS-KONFLIKTE (LINK ZUM SCRIPT) -->
-<section class="card">
-    <h2 class="card-title">Prüfungs-Konflikte</h2>
-
-    <p class="text">
-        Hier kannst du prüfen, ob an einem Tag mehrere Prüfungen eingetragen sind.
-        Die Auswertung wird automatisch aus dem Kalender erstellt.
-    </p>
-
-    <p class="text">
-        <a class="link-inline"
-           href="https://script.google.com/macros/s/AKfycbxd9pX-fPYpQuLvXeKpEaf-45xRBOwJY1q4t41-FToqTKgZcZPHv9GO_ArfyU0j0bO9cA/exec"
-           target="_blank" rel="noopener">
-           🔍 Konfliktübersicht in neuem Tab öffnen
-        </a>
-    </p>
-
-    <p class="hint">
-        Die Seite zeigt alle Tage mit zwei oder mehr Prüfungen. Wenn nichts angezeigt wird,
-        gibt es aktuell keine Konflikte.
-    </p>
-</section>
-
-<!-- HINWEISE -->
+<!-- 🔥 5) Hinweise -->
 <section class="card">
     <h2 class="card-title">Hinweise</h2>
 
-    <p class="text">
-        Änderungen an den Terminen können nur von mir oder von mir
-        freigegebenen Personen vorgenommen werden.
-    </p>
-
-    <p class="text">
-        Bitte überprüft den Kalender regelmässig, insbesondere vor Prüfungswochen.
-    </p>
+    <p class="text">Änderungen können nur von mir oder von freigegebenen Personen vorgenommen werden.</p>
+    <p class="text">Bitte Kalender regelmässig prüfen.</p>
 </section>
 
 </div>
 
 <script>
-// ICS-Link zum Kopieren
 const calendarLink =
 "https://calendar.google.com/calendar/ical/86f3a3eb765f4c49fc250489d0a1c9230bdb67dfe31d7a3ce306e5fa1a8b4028@group.calendar.google.com/public/basic.ics";
 
@@ -248,11 +147,7 @@ function copyCalendarLink() {
     navigator.clipboard.writeText(calendarLink).then(() => {
         const msg = document.getElementById("copiedText");
         msg.style.display = "block";
-        setTimeout(() => {
-            msg.style.display = "none";
-        }, 2500);
-    }).catch(() => {
-        alert("Kopieren nicht möglich. Bitte den Link im Kasten darunter manuell markieren und kopieren.");
+        setTimeout(() => msg.style.display = "none", 2000);
     });
 }
 </script>
