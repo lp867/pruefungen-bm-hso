@@ -246,12 +246,11 @@
       </div>`;
   }
 
-  function renderStats(now) {
-    const upcoming = state.events.filter((e) => e.end > now);
-    const soon = upcoming.filter((e) => e.start - now < 30 * DAY).length;
-    const past = state.events.length - upcoming.length;
-    const stat = (n, label, red) => `<div class="stat"><div class="stat__num${red ? " stat__num--red" : ""}">${n}</div><div class="stat__label">${label}</div></div>`;
-    $("stats").innerHTML = stat(upcoming.length, "Kommend", true) + stat(soon, "Nächste 30 Tage") + stat(past, "Erledigt");
+  // Anzahl Einträge als kleine Zähler in den Tabs
+  function renderCounts(now) {
+    const upcoming = state.events.filter((e) => e.end > now).length;
+    const counts = { upcoming, past: state.events.length - upcoming, all: state.events.length };
+    document.querySelectorAll("[data-count]").forEach((el) => { el.textContent = counts[el.dataset.count]; });
   }
 
   // ---------- Konflikte: mehrere Prüfungen am selben Tag ----------
@@ -290,6 +289,8 @@
     inRange.forEach((e) => present.set(e.subject.name, e.subject));
     if (state.subject && !present.has(state.subject)) state.subject = null;
     const chips = [...present.values()].sort((a, b) => a.name.localeCompare(b.name, LOCALE));
+    // Ein Fachfilter lohnt sich erst ab zwei Fächern
+    $("subjects").hidden = chips.length < 2;
     $("subjects").innerHTML =
       `<button type="button" class="chip chip--all" data-subject="" aria-pressed="${!state.subject}">Alle Fächer</button>` +
       chips.map((s) => `<button type="button" class="chip" style="--h:${s.hue}" data-subject="${esc(s.name)}" aria-pressed="${state.subject === s.name}">${esc(s.name)}</button>`).join("");
@@ -311,41 +312,47 @@
       return;
     }
 
-    let html = "";
-    let lastMonth = "";
+    // Nach Monat gruppieren: pro Monat eine Überschrift und ein Block mit Zeilen
+    const groups = [];
     for (const e of shown) {
       const month = fmt.month.format(e.start);
-      if (month !== lastMonth) { html += `<h3 class="month">${esc(month)}</h3>`; lastMonth = month; }
-      const past = e.end <= now;
-      const daysLeft = dayDiff(now, e.start);
-      const soon = !past && daysLeft <= settings.soonDays;
-      html += `
-        <article class="card${past ? " card--past" : ""}" style="--h:${e.subject.hue}">
-          <div class="date"><span class="date__day">${e.start.getDate()}</span><span class="date__wd">${esc(fmt.weekdayShort.format(e.start).replace(".", ""))}</span></div>
-          <div>
-            <h4 class="card__title">${esc(e.title)}</h4>
-            <p class="card__meta">
-              <span>${esc(timeLabel(e))}</span>
-              ${e.location ? `<span>${esc(e.location)}</span>` : ""}
-            </p>
-            ${e.description ? `<p class="card__desc">${esc(e.description)}</p>` : ""}
-            <div class="tags">
-              <span class="tag tag--subject">${esc(e.subject.name)}</span>
-              ${e.kind ? `<span class="tag${/Nach|Frist/.test(e.kind) ? " tag--warn" : ""}">${esc(e.kind)}</span>` : ""}
-              ${e.sameDay ? `<span class="tag tag--warn" title="${esc(e.sameDayTitles.join(", "))}">${esc(conflictLabel(e))}</span>` : ""}
-            </div>
-          </div>
-          <div class="when${soon ? " when--soon" : ""}">${esc(relLabel(e, now))}</div>
-        </article>`;
+      if (!groups.length || groups[groups.length - 1].month !== month) groups.push({ month, items: [] });
+      groups[groups.length - 1].items.push(e);
     }
-    list.innerHTML = html;
+
+    list.innerHTML = groups.map((g) => `
+      <section class="month-group">
+        <h3 class="month">${esc(g.month)}</h3>
+        <div class="rows">${g.items.map((e) => renderRow(e, now)).join("")}</div>
+      </section>`).join("");
+  }
+
+  function renderRow(e, now) {
+    const past = e.end <= now;
+    const soon = !past && dayDiff(now, e.start) <= settings.soonDays;
+    const meta = [timeLabel(e), e.location].filter(Boolean).map((m) => `<span>${esc(m)}</span>`).join("");
+    const tags = [
+      e.kind ? `<span class="tag${/Nach|Frist/.test(e.kind) ? " tag--warn" : ""}">${esc(e.kind)}</span>` : "",
+      e.sameDay ? `<span class="tag tag--warn" title="${esc(e.sameDayTitles.join(", "))}">${esc(conflictLabel(e))}</span>` : "",
+    ].join("");
+    return `
+      <article class="row${past ? " row--past" : ""}" style="--h:${e.subject.hue}">
+        <div class="row__date"><span class="row__day">${e.start.getDate()}</span><span class="row__wd">${esc(fmt.weekdayShort.format(e.start).replace(".", ""))}</span></div>
+        <div class="row__main">
+          <h4 class="row__title">${esc(e.title)}</h4>
+          <p class="row__meta"><span class="row__subject">${esc(e.subject.name)}</span>${meta}</p>
+          ${e.description ? `<p class="row__desc">${esc(e.description)}</p>` : ""}
+          ${tags ? `<div class="tags">${tags}</div>` : ""}
+        </div>
+        <div class="when${soon ? " when--soon" : ""}">${esc(relLabel(e, now))}</div>
+      </article>`;
   }
 
   function render() {
     if (!state.loaded) return;
     const now = new Date();
     renderHero(now);
-    renderStats(now);
+    renderCounts(now);
     renderList(now);
     renderFacts(now);
     $("source").textContent = state.source;
@@ -410,7 +417,7 @@
     const menu = $("menu");
     const header = document.querySelector(".top");
     // Alles ausser Kopfzeile und Panel ist gesperrt, solange das Menü offen ist
-    const background = [document.querySelector(".hero"), document.querySelector("main"), document.querySelector(".foot"), document.querySelector(".top__actions")];
+    const background = [document.querySelector(".hero"), document.querySelector("main"), document.querySelector(".foot")];
 
     const isOpen = () => menu.getAttribute("aria-expanded") === "true";
 
@@ -468,9 +475,7 @@
       state.query = ev.target.value;
       renderList(new Date());
     });
-    const subscribeUrl = `https://calendar.google.com/calendar/render?cid=${encodeURIComponent(CONFIG.calendarId)}`;
-    $("subscribe").href = subscribeUrl;
-    $("subscribe-2").href = subscribeUrl;
+    $("subscribe-2").href = `https://calendar.google.com/calendar/render?cid=${encodeURIComponent(CONFIG.calendarId)}`;
 
     // iCal-Link für andere Kalender-Apps (iPhone, Outlook, …)
     const icalUrl = `https://calendar.google.com/calendar/ical/${encodeURIComponent(CONFIG.calendarId)}/public/basic.ics`;

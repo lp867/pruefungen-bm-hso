@@ -29,9 +29,6 @@
           <p class="brand__sub">Alle Prüfungsdaten an der HSO auf einen Blick</p>
         </div>
       </div>
-      <div class="top__actions">
-        <a id="subscribe" class="btn" target="_blank" rel="noopener">Kalender abonnieren</a>
-      </div>
     </div>
   </header>
 
@@ -43,15 +40,15 @@
 
   <main class="wrap">
 
-    <section class="stats" id="stats" aria-label="Übersicht"></section>
-
     <section class="controls" aria-label="Filter">
-      <div class="seg" role="tablist" id="range">
-        <button type="button" role="tab" data-range="upcoming" aria-selected="true">Kommend</button>
-        <button type="button" role="tab" data-range="past" aria-selected="false">Vergangen</button>
-        <button type="button" role="tab" data-range="all" aria-selected="false">Alle</button>
+      <div class="controls__row">
+        <div class="seg" role="tablist" id="range">
+          <button type="button" role="tab" data-range="upcoming" aria-selected="true">Kommend <span class="count" data-count="upcoming"></span></button>
+          <button type="button" role="tab" data-range="past" aria-selected="false">Vergangen <span class="count" data-count="past"></span></button>
+          <button type="button" role="tab" data-range="all" aria-selected="false">Alle <span class="count" data-count="all"></span></button>
+        </div>
+        <input id="search" class="search" type="search" placeholder="Suchen…" aria-label="Prüfungen durchsuchen" autocomplete="off">
       </div>
-      <input id="search" class="search" type="search" placeholder="Suchen, z. B. Mathe" autocomplete="off">
       <div class="chips" id="subjects" aria-label="Fächer"></div>
     </section>
 
@@ -60,7 +57,6 @@
 
   <footer class="wrap foot">
     <span id="source"></span>
-    <span>Einträge kommen direkt aus dem Google-Kalender „Prüfungen BM (von Elias)“.</span>
   </footer>
 
   <!-- Einstellungen & Infos (öffnet über die zwei Balken oben links, die dabei zum X werden) -->
@@ -102,7 +98,7 @@
           </div>
         </div>
         <label class="field field--row" for="set-soon">
-          <span><b>Rot markieren ab</b><small>Prüfungen, die bald anstehen</small></span>
+          <span><b>Hervorheben ab</b><small>Prüfungen, die bald anstehen</small></span>
           <select id="set-soon" class="select">
             <option value="1">1 Tag vorher</option>
             <option value="3">3 Tage vorher</option>
