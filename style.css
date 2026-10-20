@@ -3,17 +3,17 @@
 :root {
   --bg: #fbfbf9;
   --surface: #ffffff;
-  --surface-2: #f2f4f1;
+  --surface-2: #eef1ed;
   --text: #2a2e33;
-  --muted: #747a80;
-  --line: #e7e9e4;
-  --accent: #4a8a82;         /* Petrol, gedämpft */
-  --accent-strong: #376c65;
-  --accent-soft: #e6f2ef;    /* helles Grün: aktive Tabs, Knöpfe, Banner */
-  --accent-softer: #f2f8f6;  /* ganz helles Grün: Datumskästchen, Hover */
+  --muted: #6c7278;
+  --line: #e1e4de;
+  --accent: #3f857b;         /* Petrol, gedämpft */
+  --accent-strong: #2f665e;
+  --accent-soft: #dcefea;    /* helles Grün: aktive Tabs, Knöpfe, Banner */
+  --accent-softer: #ecf6f3;  /* ganz helles Grün: Datumskästchen, Hover */
   --on-accent: #ffffff;
-  --warn-bg: #f8ecd8;        /* Hinweise: Nachprüfung, Konflikt */
-  --warn-text: #8a5b17;
+  --warn-bg: #f7e5c6;        /* Hinweise: Nachprüfung, Konflikt */
+  --warn-text: #82520f;
   --shadow: 0 1px 2px rgba(40, 44, 50, .04);
   --radius: 14px;
   --pill: 54px;
@@ -26,15 +26,15 @@
     --surface: #1d2124;
     --surface-2: #252a2d;
     --text: #e3e5e3;
-    --muted: #979ea1;
-    --line: #2d3336;
-    --accent: #7fb5ad;
-    --accent-strong: #9cc8c1;
-    --accent-soft: #1f2c2a;
-    --accent-softer: #1a2422;
+    --muted: #a4abae;
+    --line: #343c3f;
+    --accent: #88c6bc;
+    --accent-strong: #a8dad1;
+    --accent-soft: #23403b;
+    --accent-softer: #1d302c;
     --on-accent: #12201e;
-    --warn-bg: #352c1d;
-    --warn-text: #e6c48a;
+    --warn-bg: #42331b;
+    --warn-text: #f2cf8f;
     --shadow: none;
     color-scheme: dark;
   }
@@ -45,15 +45,15 @@
   --surface: #1d2124;
   --surface-2: #252a2d;
   --text: #e3e5e3;
-  --muted: #979ea1;
-  --line: #2d3336;
-  --accent: #7fb5ad;
-  --accent-strong: #9cc8c1;
-  --accent-soft: #1f2c2a;
-  --accent-softer: #1a2422;
+  --muted: #a4abae;
+  --line: #343c3f;
+  --accent: #88c6bc;
+  --accent-strong: #a8dad1;
+  --accent-soft: #23403b;
+  --accent-softer: #1d302c;
   --on-accent: #12201e;
-  --warn-bg: #352c1d;
-  --warn-text: #e6c48a;
+  --warn-bg: #42331b;
+  --warn-text: #f2cf8f;
   --shadow: none;
   color-scheme: dark;
 }
