@@ -1,156 +1,161 @@
-<!DOCTYPE html>
-<html lang="de">
+<!doctype html>
+<html lang="de-CH">
 <head>
-<meta charset="UTF-8">
-<title>Prüfungstermine BM HSO</title>
-<meta name="viewport" content="width=device-width, initial-scale=1">
-
-<style>
-:root {
-    --bg:#f5f7fb;
-    --card:#ffffff;
-    --accent:#2563eb;
-    --text:#111827;
-    --muted:#6b7280;
-    --border:#e5e7eb;
-    --ok:#16a34a;
-}
-
-* { box-sizing:border-box; font-family:system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif; }
-body { margin:0; background:var(--bg); color:var(--text); }
-.container { max-width:800px; margin:auto; padding:24px 16px 40px; }
-
-header { margin-bottom:24px; }
-h1 { margin:0 0 6px; font-size:1.8rem; }
-.subtitle { color:var(--muted); font-size:0.95rem; }
-
-.card {
-    background:var(--card);
-    border-radius:12px;
-    padding:18px;
-    margin-bottom:16px;
-    box-shadow:0 8px 20px rgba(15,23,42,.08);
-}
-
-.card-title { margin:0 0 10px; font-size:1.15rem; }
-.text { margin:0 0 10px; font-size:.95rem; color:var(--muted); line-height:1.5; }
-
-.btn {
-    display:inline-block;
-    margin-top:6px;
-    padding:10px 18px;
-    background:var(--accent);
-    color:#fff;
-    border-radius:999px;
-    text-decoration:none;
-    cursor:pointer;
-    font-size:.9rem;
-    border:none;
-}
-
-.copied { color:var(--ok); font-size:.85rem; margin-top:6px; display:none; }
-
-.link-box {
-    margin-top:10px; padding:10px;
-    border:1px solid var(--border); border-radius:8px;
-    background:#fafafa; font-size:.85rem;
-    word-break:break-all;
-}
-
-.link-inline { color:var(--accent); text-decoration:none; font-weight:500; }
-.link-inline:hover { text-decoration:underline; }
-
-</style>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Prüfungen BM</title>
+  <meta name="description" content="Alle Prüfungsdaten der BM an der HSO auf einen Blick.">
+  <script>
+    // Design sofort setzen, damit die Seite nicht kurz im falschen Modus aufblitzt
+    try {
+      var t = (JSON.parse(localStorage.getItem("pruefungen:settings")) || {}).theme;
+      if (t === "light" || t === "dark") document.documentElement.dataset.theme = t;
+    } catch (e) {}
+  </script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css">
 </head>
-
 <body>
-<div class="container">
-
-<header>
-    <h1>Prüfungstermine BM HSO</h1>
-    <p class="subtitle">Zentrale Übersicht über alle Prüfungstermine der Klasse.</p>
-</header>
-
-<!-- 🔥 1) Komplette Prüfungs-Liste -->
-<section class="card">
-    <h2 class="card-title">Kommende Prüfungen (Liste)</h2>
-    <p class="text">Diese Liste wird automatisch aus dem Prüfungskalender geladen.</p>
-
-    <div style="border-radius:8px;overflow:hidden;border:1px solid var(--border);">
-        <iframe
-            src="https://calendar.google.com/calendar/embed?src=86f3a3eb765f4c49fc250489d0a1c9230bdb67dfe31d7a3ce306e5fa1a8b4028%40group.calendar.google.com&mode=AGENDA&showTitle=0&showPrint=0&showTabs=0&showCalendars=0&showNav=0&ctz=Europe/Zurich"
-            style="border:0;width:100%;height:400px;" loading="lazy">
-        </iframe>
+  <header class="top">
+    <div class="wrap top__inner">
+      <div class="brand">
+        <button id="menu" class="menu-btn" type="button" aria-label="Einstellungen und Infos öffnen" aria-controls="settings" aria-expanded="false">
+          <span></span><span></span>
+        </button>
+        <div>
+          <h1>Prüfungen <em>BM</em></h1>
+          <p class="brand__sub">Alle Prüfungsdaten an der HSO auf einen Blick</p>
+        </div>
+      </div>
+      <div class="top__actions">
+        <a id="subscribe" class="btn" target="_blank" rel="noopener">Kalender abonnieren</a>
+      </div>
     </div>
-</section>
+  </header>
 
-<!-- 🔥 2) Konfliktübersicht -->
-<section class="card">
-    <h2 class="card-title">Prüfungs-Konflikte</h2>
-
-    <p class="text">
-        Zeigt automatisch alle Tage mit mehreren Prüfungen an.
-    </p>
-
-    <p class="text">
-        <a class="link-inline" target="_blank"
-           href="https://script.google.com/macros/s/AKfycbxd9pX-fPYpQuLvXeKpEaf-45xRBOwJY1q4t41-FToqTKgZcZPHv9GO_ArfyU0j0bO9cA/exec">
-           🔍 Konfliktübersicht öffnen
-        </a>
-    </p>
-</section>
-
-<!-- 🔥 3) Kalender-Link kopieren -->
-<section class="card">
-    <h2 class="card-title">Kalender-Link kopieren</h2>
-
-    <p class="text">Mit diesem Button kannst du den Prüfungskalender sofort kopieren.</p>
-
-    <button class="btn" onclick="copyCalendarLink()">Kalender-Link kopieren</button>
-
-    <div id="copiedText" class="copied">✅ Link wurde kopiert</div>
-
-    <p class="hint">Diesen Link in deiner Kalender-App als „Internetkalender“ einfügen.</p>
-</section>
-
-<!-- 🔥 4) Anleitung -->
-<section class="card">
-    <h2 class="card-title">Kurzanleitung</h2>
-
-    <p class="text">
-        1) Button drücken <br>
-        2) Kalender-App öffnen <br>
-        3) „Kalender aus URL“ auswählen <br>
-        4) Einfügen → fertig
-    </p>
-
-    <div class="link-box">
-https://calendar.google.com/calendar/ical/86f3a3eb765f4c49fc250489d0a1c9230bdb67dfe31d7a3ce306e5fa1a8b4028@group.calendar.google.com/public/basic.ics
+  <section class="hero" aria-label="Nächste Prüfung">
+    <div id="hero" class="wrap">
+      <div class="hero__skeleton">Prüfungen werden geladen…</div>
     </div>
-</section>
+  </section>
 
-<!-- 🔥 5) Hinweise -->
-<section class="card">
-    <h2 class="card-title">Hinweise</h2>
+  <main class="wrap">
 
-    <p class="text">Änderungen können nur von mir oder von freigegebenen Personen vorgenommen werden.</p>
-    <p class="text">Bitte Kalender regelmässig prüfen.</p>
-</section>
+    <section class="stats" id="stats" aria-label="Übersicht"></section>
 
-</div>
+    <section class="controls" aria-label="Filter">
+      <div class="seg" role="tablist" id="range">
+        <button type="button" role="tab" data-range="upcoming" aria-selected="true">Kommend</button>
+        <button type="button" role="tab" data-range="past" aria-selected="false">Vergangen</button>
+        <button type="button" role="tab" data-range="all" aria-selected="false">Alle</button>
+      </div>
+      <input id="search" class="search" type="search" placeholder="Suchen, z. B. Mathe" autocomplete="off">
+      <div class="chips" id="subjects" aria-label="Fächer"></div>
+    </section>
 
-<script>
-const calendarLink =
-"https://calendar.google.com/calendar/ical/86f3a3eb765f4c49fc250489d0a1c9230bdb67dfe31d7a3ce306e5fa1a8b4028@group.calendar.google.com/public/basic.ics";
+    <section id="list" class="list" aria-live="polite"></section>
+  </main>
 
-function copyCalendarLink() {
-    navigator.clipboard.writeText(calendarLink).then(() => {
-        const msg = document.getElementById("copiedText");
-        msg.style.display = "block";
-        setTimeout(() => msg.style.display = "none", 2000);
-    });
-}
-</script>
+  <footer class="wrap foot">
+    <span id="source"></span>
+    <span>Einträge kommen direkt aus dem Google-Kalender „Prüfungen BM (von Elias)“.</span>
+  </footer>
 
+  <!-- Einstellungen & Infos (öffnet über die zwei Balken oben links, die dabei zum X werden) -->
+  <div id="settings-overlay" class="drawer-overlay"></div>
+  <div id="settings" class="drawer" role="dialog" aria-modal="true" aria-labelledby="settings-title" inert>
+    <div class="drawer__head">
+      <h2 id="settings-title">Einstellungen</h2>
+    </div>
+
+    <div class="drawer__body">
+      <section class="drawer__sec">
+        <h3>Darstellung</h3>
+        <div class="field">
+          <span class="field__label">Design</span>
+          <div class="seg seg--full" id="set-theme" role="group" aria-label="Design">
+            <button type="button" data-value="system">System</button>
+            <button type="button" data-value="light">Hell</button>
+            <button type="button" data-value="dark">Dunkel</button>
+          </div>
+        </div>
+        <label class="toggle">
+          <span><b>Kompakte Liste</b><small>Beschreibungen und Labels ausblenden</small></span>
+          <input type="checkbox" id="set-compact">
+        </label>
+        <label class="toggle">
+          <span><b>Sekunden im Countdown</b><small>Countdown läuft sekundengenau</small></span>
+          <input type="checkbox" id="set-seconds">
+        </label>
+      </section>
+
+      <section class="drawer__sec">
+        <h3>Liste</h3>
+        <div class="field">
+          <span class="field__label">Startansicht</span>
+          <div class="seg seg--full" id="set-range" role="group" aria-label="Startansicht">
+            <button type="button" data-value="upcoming">Kommend</button>
+            <button type="button" data-value="past">Vergangen</button>
+            <button type="button" data-value="all">Alle</button>
+          </div>
+        </div>
+        <label class="field field--row" for="set-soon">
+          <span><b>Rot markieren ab</b><small>Prüfungen, die bald anstehen</small></span>
+          <select id="set-soon" class="select">
+            <option value="1">1 Tag vorher</option>
+            <option value="3">3 Tage vorher</option>
+            <option value="7">1 Woche vorher</option>
+            <option value="14">2 Wochen vorher</option>
+          </select>
+        </label>
+      </section>
+
+      <section class="drawer__sec">
+        <h3>Kalender</h3>
+        <div class="drawer__actions">
+          <a id="subscribe-2" class="btn" target="_blank" rel="noopener">Kalender abonnieren</a>
+          <button id="reload" class="btn btn--ghost" type="button">Daten neu laden</button>
+        </div>
+        <p class="hint">Mit „Abonnieren“ erscheinen alle Prüfungen automatisch in deinem eigenen Google-Kalender.</p>
+
+        <div class="field ical">
+          <label class="field__label" for="ical-url">Link für andere Kalender-Apps</label>
+          <div class="ical__row">
+            <input id="ical-url" class="ical__input" type="text" readonly>
+            <button id="ical-copy" class="btn" type="button">Kopieren</button>
+          </div>
+        </div>
+        <details class="howto">
+          <summary>So fügst du den Link ein</summary>
+          <ul>
+            <li><b>iPhone:</b> Einstellungen → Kalender → Accounts → Account hinzufügen → Andere → Kalenderabo hinzufügen → Link einfügen.</li>
+            <li><b>Outlook:</b> Kalender → Kalender hinzufügen → Aus dem Internet abonnieren → Link einfügen.</li>
+            <li><b>Android / andere:</b> „Kalender aus URL“ oder „Internetkalender“ wählen → Link einfügen.</li>
+          </ul>
+        </details>
+      </section>
+
+      <section class="drawer__sec">
+        <h3>Infos</h3>
+        <dl class="facts" id="facts"></dl>
+        <details class="howto">
+          <summary>So trägst du eine Prüfung ein</summary>
+          <ul>
+            <li>Termin im Google-Kalender <b>„Prüfungen BM (von Elias)“</b> erstellen.</li>
+            <li>Das <b>Fach</b> im Titel nennen, z. B. „Mathe Prüfung“ oder „T&amp;U Prüfung“.</li>
+            <li>Wörter wie <b>Abgabe</b>, <b>Frist</b>, <b>Nachprüfung</b> oder <b>Kurzprüfung</b> erzeugen ein Zusatz-Label.</li>
+            <li><b>Ort</b> (Zimmer) und <b>Beschreibung</b> (z. B. Themen) werden mit angezeigt.</li>
+          </ul>
+        </details>
+        <p class="hint">Einträge ändern können nur Elias und freigegebene Personen. Bei Fragen oder fehlenden Prüfungen wende dich an Elias.</p>
+        <p class="hint">Ein Projekt von Elias für die BM an der HSO. Kein offizielles Angebot der HSO.</p>
+      </section>
+    </div>
+  </div>
+
+  <script src="config.js"></script>
+  <script src="app.js"></script>
 </body>
 </html>
