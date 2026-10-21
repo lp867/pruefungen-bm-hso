@@ -77,7 +77,17 @@ body {
   background: var(--bg);
   border-bottom: 1px solid var(--line);
 }
-.top__inner { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding-top: 14px; padding-bottom: 14px; }
+.top__inner { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding-top: 14px; padding-bottom: 6px; }
+
+/* Ansichts-Tabs in der Kopfzeile: Prüfungen | Stundenplan */
+.views { display: flex; gap: 26px; }
+.views__tab {
+  padding: 8px 0 10px; border-bottom: 2px solid transparent;
+  color: var(--muted); font-size: 14px; font-weight: 600; text-decoration: none;
+}
+.views__tab:hover { color: var(--text); }
+.views__tab[aria-current="page"] { color: var(--text); border-bottom-color: var(--accent); }
+.views__tab:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 4px; }
 .brand { display: flex; align-items: center; gap: 12px; min-width: 0; }
 /* Die zwei roten Balken = Menü-Knopf */
 .menu-btn {
@@ -315,10 +325,77 @@ html { scrollbar-gutter: stable; }
 .howto li { margin-bottom: 4px; }
 .hint { color: var(--muted); font-size: 12px; margin: 12px 0 0; }
 
+/* Stundenplan */
+.timetable { padding-top: 28px; max-width: 1100px; } /* breiter, damit 5–6 Tagesspalten Platz haben */
+.tt-now {
+  display: flex; flex-wrap: wrap; align-items: baseline; gap: 2px 12px;
+  padding: 18px 20px; border-radius: var(--radius);
+  background: linear-gradient(180deg, var(--accent-soft), var(--accent-softer));
+}
+.tt-now:empty { display: none; }
+.tt-now__label { width: 100%; font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: .1em; color: var(--accent-strong); }
+.tt-now strong { font-size: 24px; font-weight: 500; }
+.tt-now span:not(.tt-now__label) { color: var(--muted); font-weight: 500; }
+.tt-now__after { width: 100%; font-size: 13px; }
+
+.tt-nav { display: flex; align-items: center; gap: 10px; margin: 24px 0 14px; }
+.tt-nav__btn {
+  flex: none; width: 38px; height: 38px; border-radius: 50%;
+  border: 1px solid var(--line); background: var(--surface); color: var(--text);
+  font: inherit; font-size: 20px; line-height: 1; cursor: pointer;
+}
+.tt-nav__btn:hover { background: var(--accent-softer); border-color: var(--accent-soft); }
+.tt-nav__btn:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.tt-nav__label { display: flex; flex-direction: column; align-items: center; min-width: 170px; line-height: 1.3; }
+.tt-nav__label strong { font-size: 15px; }
+.tt-nav__label span { color: var(--muted); font-size: 13px; font-weight: 500; }
+.tt-nav__today { height: 36px; padding: 0 16px; margin-left: auto; font-size: 13px; }
+.tt-nav__today[hidden] { display: none; }
+
+.tt-week { display: grid; grid-template-columns: repeat(var(--days, 5), minmax(0, 1fr)); gap: 10px; }
+.tt-day { min-width: 0; padding: 10px; border: 1px solid var(--line); border-radius: var(--radius); background: var(--surface); }
+.tt-day--today { border-color: var(--accent); background: var(--accent-softer); }
+.tt-day__head { display: flex; align-items: baseline; gap: 6px; margin: 2px 4px 10px; font-size: 14px; }
+.tt-day__wd { font-weight: 700; }
+.tt-day__date { color: var(--muted); font-size: 13px; font-weight: 500; }
+.tt-day__badge {
+  margin-left: auto; padding: 2px 8px; border-radius: var(--pill);
+  background: var(--accent-soft); color: var(--accent-strong); font-size: 11px; font-weight: 700;
+}
+
+.tt-lesson {
+  --h: 0;
+  display: flex; flex-direction: column; gap: 1px; margin-bottom: 6px; padding: 8px 10px;
+  border-radius: 10px; border-left: 3px solid hsl(var(--h) 50% 55%); background: var(--surface-2);
+}
+.tt-lesson__time { color: var(--muted); font-size: 12px; font-weight: 500; font-variant-numeric: tabular-nums; }
+.tt-lesson__subject { font-size: 14px; font-weight: 700; overflow-wrap: anywhere; }
+.tt-lesson__room { color: var(--muted); font-size: 12px; }
+.tt-lesson--past { opacity: .5; }
+.tt-lesson--now { background: var(--accent-soft); box-shadow: inset 0 0 0 1px var(--accent); }
+
+.tt-exam {
+  display: flex; flex-direction: column; gap: 1px; margin-bottom: 6px; padding: 8px 10px;
+  border-radius: 10px; background: var(--warn-bg); color: var(--warn-text); font-size: 12px; font-weight: 500;
+}
+.tt-exam__label { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .06em; }
+.tt-exam strong { font-size: 14px; overflow-wrap: anywhere; }
+.tt-free { margin: 4px; color: var(--muted); font-size: 13px; }
+.tt-empty { grid-column: 1 / -1; margin-top: 0; }
+
+/* Auf schmalen Bildschirmen: Tage untereinander, Lektionen als Zeilen (Zeit links) */
+@media (max-width: 760px) {
+  .tt-week { grid-template-columns: 1fr; }
+  .tt-lesson { display: grid; grid-template-columns: 92px 1fr; column-gap: 10px; }
+  .tt-lesson__time { grid-row: span 2; padding-top: 2px; }
+}
+
 .foot { color: var(--muted); font-size: 12px; padding-top: 48px; padding-bottom: 32px; }
 
 @media (max-width: 600px) {
   .brand__sub { display: none; }
+  .timetable { padding-top: 20px; }
+  .tt-nav__label { min-width: 0; flex: 1; }
   .hero { padding: 28px 0; }
   .countdown__cell { min-width: 60px; }
   .controls { margin-top: 24px; }

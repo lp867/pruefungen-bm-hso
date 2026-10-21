@@ -30,15 +30,19 @@
         </div>
       </div>
     </div>
+    <nav class="wrap views" aria-label="Ansicht">
+      <a class="views__tab" href="#pruefungen" data-view="pruefungen">Prüfungen</a>
+      <a class="views__tab" href="#stundenplan" data-view="stundenplan">Stundenplan</a>
+    </nav>
   </header>
 
-  <section class="hero" aria-label="Nächste Prüfung">
+  <section class="hero" aria-label="Nächste Prüfung" data-panel="pruefungen">
     <div id="hero" class="wrap">
       <div class="hero__skeleton">Prüfungen werden geladen…</div>
     </div>
   </section>
 
-  <main class="wrap">
+  <main class="wrap" data-panel="pruefungen">
 
     <section class="controls" aria-label="Filter">
       <div class="controls__row">
@@ -53,6 +57,18 @@
     </section>
 
     <section id="list" class="list" aria-live="polite"></section>
+  </main>
+
+  <!-- Stundenplan (Daten: data/stundenplan.json, automatisch aus OpenOLAT erzeugt) -->
+  <main class="wrap timetable" data-panel="stundenplan" hidden>
+    <div id="tt-now" class="tt-now"></div>
+    <div class="tt-nav">
+      <button id="tt-prev" class="tt-nav__btn" type="button" aria-label="Vorherige Woche">‹</button>
+      <div class="tt-nav__label" id="tt-label" aria-live="polite"></div>
+      <button id="tt-next" class="tt-nav__btn" type="button" aria-label="Nächste Woche">›</button>
+      <button id="tt-today" class="btn tt-nav__today" type="button">Heute</button>
+    </div>
+    <div id="tt-week" class="tt-week"></div>
   </main>
 
   <footer class="wrap foot">

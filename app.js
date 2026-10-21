@@ -14,10 +14,12 @@
     { name: "Recht", hue: 30, re: /recht/i },
     { name: "VWL", hue: 45, re: /vwl|wirtschaft/i },
     { name: "FRW", hue: 190, re: /frw|finanz|rechnungswesen/i },
-    { name: "T&U", hue: 100, re: /t\s*&\s*u|technik|umwelt/i },
+    { name: "T&U", hue: 100, re: /t\s*&\s*u|\btu\b|technik|umwelt/i },
     { name: "IKT", hue: 320, re: /ikt|informatik/i },
-    { name: "Geschichte", hue: 15, re: /geschichte|politik/i },
+    { name: "Geschichte", hue: 15, re: /geschichte|politik|\bgp\b/i },
     { name: "IDAF", hue: 285, re: /idaf|idpa/i },
+    { name: "BK", hue: 340, re: /\bbk\b|betriebskunde/i },
+    { name: "Sport", hue: 125, re: /sport/i },
     { name: "SPA", hue: 170, re: /\bspa\b/i },
   ];
   const OTHER = { name: "Sonstiges", hue: 220 };
@@ -355,7 +357,12 @@
     renderCounts(now);
     renderList(now);
     renderFacts(now);
-    $("source").textContent = state.source;
+    if (view === "stundenplan") renderTimetable(now); // Prüfungen erscheinen auch im Stundenplan
+    renderFooter();
+  }
+
+  function renderFooter() {
+    $("source").textContent = view === "stundenplan" ? tt.source : state.source;
   }
 
   function renderFacts(now) {
@@ -378,6 +385,172 @@
     state.range = range;
     document.querySelectorAll("#range button").forEach((b) => b.setAttribute("aria-selected", String(b.dataset.range === range)));
     render();
+  }
+
+  // ---------- Ansichten: Prüfungen | Stundenplan ----------
+
+  const VIEWS = ["pruefungen", "stundenplan"];
+  let view = "pruefungen";
+
+  function setView(next) {
+    view = VIEWS.includes(next) ? next : "pruefungen";
+    document.querySelectorAll("[data-panel]").forEach((el) => { el.hidden = el.dataset.panel !== view; });
+    document.querySelectorAll(".views__tab").forEach((a) => {
+      if (a.dataset.view === view) a.setAttribute("aria-current", "page");
+      else a.removeAttribute("aria-current");
+    });
+    if (view === "stundenplan") {
+      if (!tt.loaded) loadTimetable();
+      else renderTimetable(new Date());
+    }
+    renderFooter();
+  }
+
+  function initViews() {
+    window.addEventListener("hashchange", () => setView(location.hash.slice(1)));
+    setView(location.hash.slice(1));
+  }
+
+  // ---------- Stundenplan ----------
+
+  const tt = { lessons: [], loaded: false, offset: 0, source: "" };
+  const WEEKDAYS = ["So", "Mo", "Di", "Mi", "Do", "Fr", "Sa"];
+
+  // "2026-10-21T08:30" als lokale Zeit lesen
+  function localDate(s) {
+    const [d, t = "00:00"] = s.split("T");
+    const [y, m, day] = d.split("-").map(Number);
+    const [h, mi] = t.split(":").map(Number);
+    return new Date(y, m - 1, day, h, mi);
+  }
+
+  async function loadTimetable() {
+    $("tt-week").innerHTML = `<div class="empty">Stundenplan wird geladen…</div>`;
+    try {
+      const res = await fetch(CONFIG.timetableUrl || "data/stundenplan.json", { cache: "no-store" });
+      if (!res.ok) throw new Error(`Stundenplan nicht gefunden (${res.status})`);
+      const data = await res.json();
+      tt.lessons = data.lessons.map((l) => ({
+        start: localDate(l.start),
+        end: localDate(l.end),
+        subject: l.subject,
+        room: l.room,
+        note: l.note || "",
+        color: classify(l.subject).subject.hue,
+      }));
+      tt.loaded = true;
+      tt.source = `Stundenplan aus OpenOLAT · zuletzt geändert ${fmt.stamp.format(new Date(data.updated))}`;
+      renderTimetable(new Date());
+      renderFooter();
+    } catch (err) {
+      console.error(err);
+      $("tt-week").innerHTML = `<div class="error">${esc(err.message)}</div>`;
+    }
+  }
+
+  function mondayOf(d) {
+    const day = startOfDay(d);
+    day.setDate(day.getDate() - ((day.getDay() + 6) % 7));
+    return day;
+  }
+
+  // Kalenderwoche nach ISO 8601
+  function isoWeek(d) {
+    const t = new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()));
+    t.setUTCDate(t.getUTCDate() + 4 - (t.getUTCDay() || 7));
+    return Math.ceil(((t - Date.UTC(t.getUTCFullYear(), 0, 1)) / DAY + 1) / 7);
+  }
+
+  function shownMonday(now) {
+    const base = mondayOf(now);
+    // Am Wochenende gleich die kommende Woche zeigen
+    if (now.getDay() === 6 || now.getDay() === 0) base.setDate(base.getDate() + 7);
+    base.setDate(base.getDate() + tt.offset * 7);
+    return base;
+  }
+
+  const timeRange = (a, b) => `${fmt.time.format(a)}–${fmt.time.format(b)}`;
+
+  // "Jetzt" bzw. "Als Nächstes" für heute oder den nächsten Schultag
+  function renderNow(now) {
+    const box = $("tt-now");
+    const current = tt.lessons.find((l) => l.start <= now && now < l.end);
+    const next = tt.lessons.find((l) => l.start > now);
+    const place = (l) => (l.room ? ` · ${esc(l.room)}` : "");
+    if (current) {
+      box.innerHTML = `<span class="tt-now__label">Jetzt</span><strong>${esc(current.subject)}</strong><span>bis ${fmt.time.format(current.end)}${place(current)}</span>` +
+        (next && dayDiff(now, next.start) === 0 ? `<span class="tt-now__after">danach ${esc(next.subject)} um ${fmt.time.format(next.start)}</span>` : "");
+    } else if (next) {
+      const diff = dayDiff(now, next.start);
+      const when = diff === 0 ? `heute um ${fmt.time.format(next.start)}` : diff === 1 ? `morgen um ${fmt.time.format(next.start)}`
+        : `${fmt.full.format(next.start)}, ${fmt.time.format(next.start)}`;
+      box.innerHTML = `<span class="tt-now__label">Als Nächstes</span><strong>${esc(next.subject)}</strong><span>${esc(when)}${place(next)}</span>`;
+    } else {
+      box.innerHTML = `<span class="tt-now__label">Stundenplan</span><span>Keine weiteren Lektionen eingetragen.</span>`;
+    }
+  }
+
+  function renderTimetable(now) {
+    if (!tt.loaded) return;
+    renderNow(now);
+
+    const monday = shownMonday(now);
+    const days = [];
+    for (let i = 0; i < 7; i++) {
+      const date = new Date(monday);
+      date.setDate(monday.getDate() + i);
+      const key = date.getTime();
+      const lessons = tt.lessons.filter((l) => startOfDay(l.start).getTime() === key);
+      const exams = state.events.filter((e) => e.kind !== "Info" && startOfDay(e.start).getTime() === key);
+      // Samstag/Sonntag nur zeigen, wenn dort etwas stattfindet
+      if (i >= 5 && !lessons.length && !exams.length) continue;
+      days.push({ date, lessons, exams });
+    }
+
+    const friday = new Date(monday);
+    friday.setDate(monday.getDate() + 4);
+    $("tt-label").innerHTML = `<strong>KW ${isoWeek(monday)}</strong><span>${esc(fmt.dayMonth.format(monday))} – ${esc(fmt.dayMonth.format(friday))} ${friday.getFullYear()}</span>`;
+    $("tt-today").hidden = tt.offset === 0;
+
+    const empty = days.every((d) => !d.lessons.length && !d.exams.length);
+    const week = $("tt-week");
+    week.style.setProperty("--days", days.length);
+    if (empty) {
+      week.innerHTML = `<div class="empty tt-empty">Keine Lektionen in dieser Woche, vielleicht Ferien. 🌿</div>`;
+      return;
+    }
+
+    week.innerHTML = days.map(({ date, lessons, exams }) => {
+      const isToday = dayDiff(now, date) === 0;
+      const examHtml = exams.map((e) =>
+        `<div class="tt-exam"><span class="tt-exam__label">${e.kind && /Abgabe|Frist/.test(e.kind) ? "Abgabe" : "Prüfung"}</span><strong>${esc(e.title)}</strong>${e.allDay ? "" : `<span>${esc(timeRange(e.start, e.end))}</span>`}</div>`
+      ).join("");
+      const lessonHtml = lessons.map((l) => {
+        const cls = l.end <= now ? " tt-lesson--past" : l.start <= now ? " tt-lesson--now" : "";
+        return `<div class="tt-lesson${cls}" style="--h:${l.color}">
+            <span class="tt-lesson__time">${esc(timeRange(l.start, l.end))}</span>
+            <span class="tt-lesson__subject">${esc(l.subject)}</span>
+            ${l.room || l.note ? `<span class="tt-lesson__room">${esc([l.room, l.note].filter(Boolean).join(" · "))}</span>` : ""}
+          </div>`;
+      }).join("");
+      return `<section class="tt-day${isToday ? " tt-day--today" : ""}">
+          <h3 class="tt-day__head"><span class="tt-day__wd">${WEEKDAYS[date.getDay()]}</span><span class="tt-day__date">${date.getDate()}.${date.getMonth() + 1}.</span>${isToday ? `<span class="tt-day__badge">Heute</span>` : ""}</h3>
+          ${examHtml}${lessonHtml || (examHtml ? "" : `<p class="tt-free">frei</p>`)}
+        </section>`;
+    }).join("");
+  }
+
+  function initTimetable() {
+    const move = (delta) => { tt.offset = delta === 0 ? 0 : tt.offset + delta; renderTimetable(new Date()); };
+    $("tt-prev").addEventListener("click", () => move(-1));
+    $("tt-next").addEventListener("click", () => move(1));
+    $("tt-today").addEventListener("click", () => move(0));
+    // Pfeiltasten wechseln die Woche, solange der Stundenplan offen ist und nicht getippt wird
+    document.addEventListener("keydown", (ev) => {
+      if (view !== "stundenplan" || ev.target.closest("input, select, textarea") || document.body.classList.contains("menu-open")) return;
+      if (ev.key === "ArrowLeft") move(-1);
+      if (ev.key === "ArrowRight") move(1);
+    });
   }
 
   // ---------- Einstellungen ----------
@@ -417,7 +590,7 @@
     const menu = $("menu");
     const header = document.querySelector(".top");
     // Alles ausser Kopfzeile und Panel ist gesperrt, solange das Menü offen ist
-    const background = [document.querySelector(".hero"), document.querySelector("main"), document.querySelector(".foot")];
+    const background = [...document.querySelectorAll("[data-panel], .views, .foot")];
 
     const isOpen = () => menu.getAttribute("aria-expanded") === "true";
 
@@ -531,8 +704,13 @@
 
   initSettings();
   initControls();
+  initTimetable();
   setRange(["upcoming", "past", "all"].includes(state.range) ? state.range : "upcoming");
+  initViews();
   refresh();
-  setInterval(render, 60 * 1000);                 // "heute/morgen" & Listen aktuell halten
+  setInterval(() => {                             // "heute/morgen", "Jetzt" & Listen aktuell halten
+    render();
+    if (!state.loaded && view === "stundenplan") renderTimetable(new Date());
+  }, 60 * 1000);
   if (CONFIG.apiKey) setInterval(refresh, 10 * 60 * 1000); // neue Einträge alle 10 Min.
 })();

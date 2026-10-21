@@ -13,4 +13,7 @@ window.PRUEFUNGEN_CONFIG = {
 
   // Wie weit zurück vergangene Prüfungen geladen werden (Tage)
   pastDays: 400,
+
+  // Stundenplan: wird automatisch aus OpenOLAT erzeugt (tools/stundenplan.py, GitHub Action)
+  timetableUrl: "data/stundenplan.json",
 };

@@ -17,6 +17,17 @@ Bei Fragen oder fehlenden Prüfungen: an Elias wenden.
 | `config.js` | Kalender-ID und API-Schlüssel |
 | `data/pruefungen.ics` | Lokale Kopie des Kalenders (Fallback) |
 | `update-kalender.ps1` | Aktualisiert die lokale Kopie |
+| `data/stundenplan.json` | Stundenplan (automatisch erzeugt) |
+| `tools/stundenplan.py` | Wandelt den OpenOLAT-Stundenplan um |
+| `.github/workflows/stundenplan.yml` | Aktualisiert den Stundenplan alle 6 Stunden |
+
+## Stundenplan
+
+Der Tab **Stundenplan** zeigt die Lektionen der Klasse wochenweise, inklusive der Prüfungen aus dem Kalender.
+
+- Quelle ist der OpenOLAT-Kalender. Sein iCal-Link enthält einen persönlichen Schlüssel und ist deshalb **nicht** im Code, sondern als Secret `OLAT_ICS_URL` im GitHub-Repository gespeichert (Settings → Secrets and variables → Actions).
+- Die GitHub Action `.github/workflows/stundenplan.yml` holt den Stundenplan alle 6 Stunden, wandelt ihn mit `tools/stundenplan.py` um und speichert `data/stundenplan.json`. Darin stehen nur Datum, Zeit, Fach und Zimmer, keine Namen von Lehrpersonen.
+- Sofort aktualisieren: im Repo unter *Actions → Stundenplan aktualisieren → Run workflow*.
 
 ## Tipps für Kalendereinträge
 

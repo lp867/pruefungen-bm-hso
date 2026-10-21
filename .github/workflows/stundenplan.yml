@@ -1,0 +1,38 @@
+# Holt alle 6 Stunden den Stundenplan aus OpenOLAT und aktualisiert data/stundenplan.json.
+# Der iCal-Link ist geheim und liegt als Repository-Secret OLAT_ICS_URL bei GitHub.
+name: Stundenplan aktualisieren
+
+on:
+  schedule:
+    - cron: "17 */6 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: stundenplan
+  cancel-in-progress: false
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Stundenplan umwandeln
+        env:
+          OLAT_ICS_URL: ${{ secrets.OLAT_ICS_URL }}
+        run: python3 tools/stundenplan.py data/stundenplan.json
+
+      - name: Änderungen speichern
+        run: |
+          if git diff --quiet -- data/stundenplan.json; then
+            echo "Keine Änderungen."
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add data/stundenplan.json
+          git commit -m "Stundenplan aktualisiert"
+          git push
