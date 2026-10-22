@@ -520,22 +520,42 @@
       return;
     }
 
-    week.innerHTML = days.map(({ date, lessons, exams }) => {
+    // Zeitraster: von der frühesten bis zur spätesten Lektion der Woche (in Minuten ab Mitternacht).
+    // Jede Lektion wird nach Uhrzeit platziert und ist so hoch, wie sie dauert -> gleiche Zeiten liegen auf gleicher Höhe.
+    const minutes = (d) => d.getHours() * 60 + d.getMinutes();
+    const all = days.flatMap((d) => d.lessons);
+    const from = all.length ? Math.min(...all.map((l) => minutes(l.start))) : 8 * 60;
+    const to = all.length ? Math.max(...all.map((l) => minutes(l.end))) : 17 * 60;
+    week.style.setProperty("--span", to - from);
+
+    const hours = [];
+    for (let h = Math.ceil(from / 60) * 60; h <= to; h += 60) hours.push(h);
+    const hourLines = hours.map((h) => `<div class="tt-hour" style="--top:${h - from}"></div>`).join("");
+    const axis = `<div class="tt-axis" aria-hidden="true">
+        <div></div><div></div>
+        <div class="tt-axis__body">${hours.map((h) => `<span style="--top:${h - from}">${h / 60}:00</span>`).join("")}</div>
+      </div>`;
+
+    week.innerHTML = axis + days.map(({ date, lessons, exams }) => {
       const isToday = dayDiff(now, date) === 0;
       const examHtml = exams.map((e) =>
         `<div class="tt-exam"><span class="tt-exam__label">${e.kind && /Abgabe|Frist/.test(e.kind) ? "Abgabe" : "Prüfung"}</span><strong>${esc(e.title)}</strong>${e.allDay ? "" : `<span>${esc(timeRange(e.start, e.end))}</span>`}</div>`
       ).join("");
       const lessonHtml = lessons.map((l) => {
-        const cls = l.end <= now ? " tt-lesson--past" : l.start <= now ? " tt-lesson--now" : "";
-        return `<div class="tt-lesson${cls}" style="--h:${l.color}">
+        const len = (l.end - l.start) / 60000;
+        const cls = (l.end <= now ? " tt-lesson--past" : l.start <= now ? " tt-lesson--now" : "") + (len < 60 ? " tt-lesson--short" : "");
+        return `<div class="tt-lesson${cls}" style="--h:${l.color};--top:${minutes(l.start) - from};--len:${len}">
             <span class="tt-lesson__time">${esc(timeRange(l.start, l.end))}</span>
             <span class="tt-lesson__subject">${esc(l.subject)}</span>
             ${l.room || l.note ? `<span class="tt-lesson__room">${esc([l.room, l.note].filter(Boolean).join(" · "))}</span>` : ""}
           </div>`;
       }).join("");
+      const nowLine = isToday && minutes(now) > from && minutes(now) < to
+        ? `<div class="tt-nowline" style="--top:${minutes(now) - from}" title="Jetzt"></div>` : "";
       return `<section class="tt-day${isToday ? " tt-day--today" : ""}">
           <h3 class="tt-day__head"><span class="tt-day__wd">${WEEKDAYS[date.getDay()]}</span><span class="tt-day__date">${date.getDate()}.${date.getMonth() + 1}.</span>${isToday ? `<span class="tt-day__badge">Heute</span>` : ""}</h3>
-          ${examHtml}${lessonHtml || (examHtml ? "" : `<p class="tt-free">frei</p>`)}
+          <div class="tt-day__exams">${examHtml}</div>
+          <div class="tt-day__body">${hourLines}${lessonHtml || `<p class="tt-free">frei</p>`}${nowLine}</div>
         </section>`;
     }).join("");
   }

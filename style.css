@@ -352,8 +352,33 @@ html { scrollbar-gutter: stable; }
 .tt-nav__today { height: 36px; padding: 0 16px; margin-left: auto; font-size: 13px; }
 .tt-nav__today[hidden] { display: none; }
 
-.tt-week { display: grid; grid-template-columns: repeat(var(--days, 5), minmax(0, 1fr)); gap: 10px; }
-.tt-day { min-width: 0; padding: 10px; border: 1px solid var(--line); border-radius: var(--radius); background: var(--surface); }
+/* Zeitraster: Zeile 1 Tagesname, Zeile 2 Prüfungen, Zeile 3 Lektionen nach Uhrzeit.
+   Dank subgrid sind die drei Zeilen über alle Tage gleich hoch, so liegen gleiche Zeiten auf gleicher Höhe. */
+.tt-week {
+  --ppm: 1.35px; /* Höhe pro Minute */
+  display: grid; grid-template-columns: 40px repeat(var(--days, 5), minmax(0, 1fr));
+  grid-template-rows: auto auto auto; column-gap: 10px;
+}
+.tt-day, .tt-axis { grid-row: 1 / span 3; display: grid; grid-template-rows: subgrid; min-width: 0; }
+.tt-day { padding: 10px 10px 12px; border: 1px solid var(--line); border-radius: var(--radius); background: var(--surface); }
+.tt-day__body { position: relative; height: calc(var(--span, 540) * var(--ppm)); }
+.tt-axis__body { position: relative; }
+.tt-axis__body span {
+  position: absolute; right: 0; top: calc(var(--top) * var(--ppm)); transform: translateY(-50%);
+  color: var(--muted); font-size: 11px; font-weight: 500; font-variant-numeric: tabular-nums;
+}
+.tt-hour { position: absolute; left: 0; right: 0; top: calc(var(--top) * var(--ppm)); border-top: 1px dashed var(--line); }
+.tt-nowline {
+  position: absolute; left: -4px; right: -4px; top: calc(var(--top) * var(--ppm)); z-index: 2;
+  border-top: 2px solid var(--accent);
+}
+.tt-nowline::before {
+  content: ""; position: absolute; left: -3px; top: -5px; width: 8px; height: 8px; border-radius: 50%; background: var(--accent);
+}
+/* Jeder Teil hat seine feste Zeile, auch wenn ein Tag keine Prüfung hat (leeres Feld bleibt 0 hoch) */
+.tt-day__head { grid-row: 1; }
+.tt-day__exams { grid-row: 2; }
+.tt-day__body, .tt-axis__body { grid-row: 3; }
 .tt-day--today { border-color: var(--accent); background: var(--accent-softer); }
 .tt-day__head { display: flex; align-items: baseline; gap: 6px; margin: 2px 4px 10px; font-size: 14px; }
 .tt-day__wd { font-weight: 700; }
@@ -365,12 +390,19 @@ html { scrollbar-gutter: stable; }
 
 .tt-lesson {
   --h: 0;
-  display: flex; flex-direction: column; gap: 1px; margin-bottom: 6px; padding: 8px 10px;
+  position: absolute; left: 0; right: 0; z-index: 1;
+  top: calc(var(--top) * var(--ppm)); height: calc(var(--len) * var(--ppm) - 4px);
+  display: flex; flex-direction: column; gap: 1px; padding: 7px 10px; overflow: hidden;
   border-radius: 10px; border-left: 3px solid hsl(var(--h) 50% 55%); background: var(--surface-2);
 }
 .tt-lesson__time { color: var(--muted); font-size: 12px; font-weight: 500; font-variant-numeric: tabular-nums; }
-.tt-lesson__subject { font-size: 14px; font-weight: 700; overflow-wrap: anywhere; }
+.tt-lesson__subject { font-size: 14px; font-weight: 700; hyphens: auto; overflow-wrap: break-word; }
 .tt-lesson__room { color: var(--muted); font-size: 12px; }
+/* Kurze Lektionen (45 Min.): Zeit und Zimmer in eine Zeile, damit alles Platz hat */
+.tt-lesson--short { flex-direction: row; flex-wrap: wrap; align-content: flex-start; column-gap: 5px; padding-top: 6px; }
+.tt-lesson--short .tt-lesson__room { order: 1; }
+.tt-lesson--short .tt-lesson__room::before { content: "· "; }
+.tt-lesson--short .tt-lesson__subject { order: 2; flex-basis: 100%; }
 .tt-lesson--past { opacity: .5; }
 .tt-lesson--now { background: var(--accent-soft); box-shadow: inset 0 0 0 1px var(--accent); }
 
@@ -381,13 +413,21 @@ html { scrollbar-gutter: stable; }
 .tt-exam__label { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .06em; }
 .tt-exam strong { font-size: 14px; overflow-wrap: anywhere; }
 .tt-free { margin: 4px; color: var(--muted); font-size: 13px; }
-.tt-empty { grid-column: 1 / -1; margin-top: 0; }
+.tt-empty { grid-column: 1 / -1; grid-row: 1 / -1; margin-top: 0; }
 
-/* Auf schmalen Bildschirmen: Tage untereinander, Lektionen als Zeilen (Zeit links) */
-@media (max-width: 760px) {
-  .tt-week { grid-template-columns: 1fr; }
-  .tt-lesson { display: grid; grid-template-columns: 92px 1fr; column-gap: 10px; }
+/* Unter 960px: kein Zeitraster, Tage untereinander, Lektionen als Zeilen (Zeit links) */
+@media (max-width: 960px) {
+  .tt-week { grid-template-columns: 1fr; grid-template-rows: none; row-gap: 10px; }
+  .tt-axis, .tt-hour, .tt-nowline { display: none; }
+  .tt-day { display: block; grid-row: auto; }
+  .tt-day__body { position: static; height: auto; }
+  .tt-lesson, .tt-lesson--short {
+    position: static; height: auto; margin-bottom: 6px;
+    display: grid; grid-template-columns: 92px 1fr; column-gap: 10px; padding: 8px 10px;
+  }
   .tt-lesson__time { grid-row: span 2; padding-top: 2px; }
+  .tt-lesson--short .tt-lesson__room::before { content: none; }
+  .tt-lesson--short .tt-lesson__subject { order: 0; }
 }
 
 .foot { color: var(--muted); font-size: 12px; padding-top: 48px; padding-bottom: 32px; }
