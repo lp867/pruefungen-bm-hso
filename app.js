@@ -382,9 +382,62 @@
   // ---------- Bedienung ----------
 
   function setRange(range) {
+    const changed = state.loaded && range !== state.range;
     state.range = range;
     document.querySelectorAll("#range button").forEach((b) => b.setAttribute("aria-selected", String(b.dataset.range === range)));
     render();
+    if (changed) animate($("list"), [{ opacity: 0, transform: "translateY(6px)" }, { opacity: 1, transform: "none" }], 260);
+  }
+
+  // ---------- Animationen ----------
+
+  const reducedMotion = matchMedia("(prefers-reduced-motion: reduce)");
+  const EASE = "cubic-bezier(.22, .8, .24, 1)";
+
+  // Kleine Hülle um die Web Animations API; bei "Bewegung reduzieren" passiert nichts
+  function animate(el, keyframes, duration, easing = EASE) {
+    if (!el || reducedMotion.matches || !el.animate) return Promise.resolve();
+    const done = el.animate(keyframes, { duration, easing }).finished.catch(() => {});
+    // Falls der Browser Animationen pausiert (z. B. Hintergrund-Tab): spätestens nach der Dauer weitermachen
+    return Promise.race([done, new Promise((r) => setTimeout(r, duration + 50))]);
+  }
+
+  // Gleitende Markierung: ein Element (Pille oder Strich) wandert zum aktiven Knopf/Tab.
+  // Es reagiert selbst auf Änderungen von aria-selected / aria-pressed / aria-current.
+  function slidingIndicator(container, activeSelector, className) {
+    const mark = document.createElement("span");
+    mark.className = className;
+    mark.setAttribute("aria-hidden", "true");
+    container.prepend(mark);
+    container.classList.add("has-indicator");
+
+    const update = (instant) => {
+      const active = container.querySelector(activeSelector);
+      mark.style.opacity = active ? "1" : "0";
+      if (!active) return;
+      if (instant) mark.style.transition = "none";
+      mark.style.setProperty("--x", `${active.offsetLeft}px`);
+      mark.style.setProperty("--w", `${active.offsetWidth}px`);
+      if (instant) { void mark.offsetWidth; mark.style.transition = ""; }
+    };
+
+    new MutationObserver(() => update(false))
+      .observe(container, { subtree: true, attributes: true, attributeFilter: ["aria-selected", "aria-pressed", "aria-current"] });
+    // Bei Grössenänderungen (Fenster, Schrift geladen, Zähler in den Tabs) ohne Animation nachführen.
+    // Beobachtet werden auch die einzelnen Knöpfe, weil sich deren Breite ändern kann, ohne dass der Container wächst.
+    if (window.ResizeObserver) {
+      const ro = new ResizeObserver(() => update(true));
+      ro.observe(container);
+      container.querySelectorAll("button, a").forEach((el) => ro.observe(el));
+    }
+    if (document.fonts) document.fonts.ready.then(() => update(true));
+    update(true);
+  }
+
+  function initIndicators() {
+    document.querySelectorAll(".seg").forEach((seg) =>
+      slidingIndicator(seg, 'button[aria-selected="true"], button[aria-pressed="true"]', "seg__thumb"));
+    slidingIndicator(document.querySelector(".views"), ".views__tab[aria-current]", "views__indicator");
   }
 
   // ---------- Ansichten: Prüfungen | Stundenplan ----------
@@ -393,8 +446,15 @@
   let view = "pruefungen";
 
   function setView(next) {
+    const previous = view;
     view = VIEWS.includes(next) ? next : "pruefungen";
     document.querySelectorAll("[data-panel]").forEach((el) => { el.hidden = el.dataset.panel !== view; });
+    // Neuer Inhalt gleitet aus der Richtung des Tabs herein (Stundenplan von rechts, Prüfungen von links)
+    if (viewsReady && previous !== view) {
+      const dir = VIEWS.indexOf(view) > VIEWS.indexOf(previous) ? 1 : -1;
+      document.querySelectorAll(`[data-panel="${view}"]`).forEach((el) =>
+        animate(el, [{ opacity: 0, transform: `translateX(${dir * 28}px)` }, { opacity: 1, transform: "none" }], 320));
+    }
     document.querySelectorAll(".views__tab").forEach((a) => {
       if (a.dataset.view === view) a.setAttribute("aria-current", "page");
       else a.removeAttribute("aria-current");
@@ -406,9 +466,12 @@
     renderFooter();
   }
 
+  let viewsReady = false; // beim ersten Laden nicht animieren
+
   function initViews() {
     window.addEventListener("hashchange", () => setView(location.hash.slice(1)));
     setView(location.hash.slice(1));
+    viewsReady = true;
   }
 
   // ---------- Stundenplan ----------
@@ -580,7 +643,20 @@
   }
 
   function initTimetable() {
-    const move = (delta) => { tt.offset = delta === 0 ? 0 : tt.offset + delta; renderTimetable(new Date()); };
+    // Woche wechseln: alte Woche gleitet hinaus, neue kommt aus der Blätterrichtung herein
+    let moving = Promise.resolve();
+    const move = (delta) => {
+      const target = delta === 0 ? 0 : tt.offset + delta;
+      if (target === tt.offset) return;
+      const dir = target > tt.offset ? 1 : -1;
+      tt.offset = target;
+      const parts = [$("tt-week"), $("tt-label")];
+      moving = moving.then(async () => {
+        await Promise.all(parts.map((el) => animate(el, [{ opacity: 1, transform: "none" }, { opacity: 0, transform: `translateX(${-dir * 24}px)` }], 120, "ease-in")));
+        renderTimetable(new Date());
+        parts.forEach((el) => animate(el, [{ opacity: 0, transform: `translateX(${dir * 32}px)` }, { opacity: 1, transform: "none" }], 300));
+      });
+    };
     $("tt-prev").addEventListener("click", () => move(-1));
     $("tt-next").addEventListener("click", () => move(1));
     $("tt-today").addEventListener("click", () => move(0));
@@ -742,6 +818,7 @@
   }
 
   initSettings();
+  initIndicators();
   initControls();
   initTimetable();
   setRange(["upcoming", "past", "all"].includes(state.range) ? state.range : "upcoming");
