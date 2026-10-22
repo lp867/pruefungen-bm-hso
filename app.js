@@ -536,17 +536,36 @@
         <div class="tt-axis__body">${hours.map((h) => `<span style="--top:${h - from}">${h / 60}:00</span>`).join("")}</div>
       </div>`;
 
+    const examLabel = (e) => (e.kind && /Abgabe|Frist/.test(e.kind) ? "Abgabe" : "Prüfung");
+
     week.innerHTML = axis + days.map(({ date, lessons, exams }) => {
       const isToday = dayDiff(now, date) === 0;
-      const examHtml = exams.map((e) =>
-        `<div class="tt-exam"><span class="tt-exam__label">${e.kind && /Abgabe|Frist/.test(e.kind) ? "Abgabe" : "Prüfung"}</span><strong>${esc(e.title)}</strong>${e.allDay ? "" : `<span>${esc(timeRange(e.start, e.end))}</span>`}</div>`
+
+      // Prüfungen mit Uhrzeit, die in eine Lektion fallen, werden direkt auf dieser Lektion angezeigt (Overlay).
+      // Ganztägige Prüfungen und solche ohne passende Lektion bleiben in der Zeile oben.
+      const onLesson = new Map(); // Lektion -> Prüfungen
+      const strip = [];
+      for (const e of exams) {
+        const hits = e.allDay ? [] : lessons.filter((l) => l.start < e.end && e.start < l.end);
+        if (!hits.length) { strip.push(e); continue; }
+        for (const l of hits) onLesson.set(l, [...(onLesson.get(l) || []), e]);
+      }
+
+      const examHtml = strip.map((e) =>
+        `<div class="tt-exam"><span class="tt-exam__label">${examLabel(e)}</span><strong>${esc(e.title)}</strong>${e.allDay ? "" : `<span>${esc(timeRange(e.start, e.end))}</span>`}</div>`
       ).join("");
       const lessonHtml = lessons.map((l) => {
         const len = (l.end - l.start) / 60000;
-        const cls = (l.end <= now ? " tt-lesson--past" : l.start <= now ? " tt-lesson--now" : "") + (len < 60 ? " tt-lesson--short" : "");
-        return `<div class="tt-lesson${cls}" style="--h:${l.color};--top:${minutes(l.start) - from};--len:${len}">
+        const ex = onLesson.get(l) || [];
+        const cls = (l.end <= now ? " tt-lesson--past" : l.start <= now ? " tt-lesson--now" : "") +
+          (len < 60 ? " tt-lesson--short" : "") + (ex.length ? " tt-lesson--exam" : "");
+        const examInfo = ex.length
+          ? `<span class="tt-lesson__badge">${examLabel(ex[0])}</span><span class="tt-lesson__exam">${esc(ex.map((e) => e.title).join(", "))}</span>`
+          : "";
+        return `<div class="tt-lesson${cls}" style="--h:${l.color};--top:${minutes(l.start) - from};--len:${len}"${ex.length ? ` title="${esc(examLabel(ex[0]) + ": " + ex.map((e) => e.title).join(", "))}"` : ""}>
             <span class="tt-lesson__time">${esc(timeRange(l.start, l.end))}</span>
             <span class="tt-lesson__subject">${esc(l.subject)}</span>
+            ${examInfo}
             ${l.room || l.note ? `<span class="tt-lesson__room">${esc([l.room, l.note].filter(Boolean).join(" · "))}</span>` : ""}
           </div>`;
       }).join("");
