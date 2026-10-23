@@ -25,7 +25,8 @@ Bei Fragen oder fehlenden Prüfungen: an Elias wenden.
 ## Stundenplan
 
 Der Tab **Stundenplan** zeigt die Lektionen der Klasse wochenweise, inklusive der Prüfungen aus dem Kalender.
-Ein Klick auf eine Lektion öffnet den passenden OpenOLAT-Kurs. Oben stehen ein Ferien-Countdown und Hinweise zur Woche
+Ein Klick auf eine Lektion öffnet ein Detailfeld (Zeit, Lektionen, Zimmer, Prüfung) mit Link zum OpenOLAT-Kurs.
+Erklärungen zu allen Funktionen stehen im Menü unter „Hilfe & Infos“. Oben stehen ein Ferien-Countdown und Hinweise zur Woche
 (Zimmerwechsel, Online-Lektionen, Samstagsunterricht, freie Tage). Ferien werden aus Lücken im Stundenplan erkannt
 (ab 5 Schultagen ohne Lektion).
 

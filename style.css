@@ -60,6 +60,11 @@
 
 * { box-sizing: border-box; }
 
+.sr-only {
+  position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0; overflow: hidden;
+  clip: rect(0 0 0 0); white-space: nowrap; border: 0;
+}
+
 /* Weicher Hell/Dunkel-Wechsel (siehe withThemeTransition in app.js) */
 ::view-transition-old(root),
 ::view-transition-new(root) { animation-duration: .4s; animation-timing-function: ease; }
@@ -299,8 +304,9 @@ html { scrollbar-gutter: stable; }
 .menu-open { overflow: hidden; }
 @media (prefers-reduced-motion: reduce) { .drawer, .drawer-overlay { transition: none !important; } }
 
-.drawer__head { padding: 20px 25px 4px; }
-.drawer__head h2 { margin: 0; font-size: 22px; font-weight: 700; }
+.drawer__head { padding: 16px 25px 8px; }
+.drawer__tabs button { font-size: 14px; }
+.drawer__pane[hidden] { display: none; }
 .drawer__body { flex: 1; overflow-y: auto; padding: 8px 25px 32px; }
 .drawer__sec { padding: 18px 0; border-bottom: 1px solid var(--line); }
 .drawer__sec:last-child { border-bottom: 0; }
@@ -315,7 +321,6 @@ html { scrollbar-gutter: stable; }
 }
 .field--row:last-child, .toggle:last-child { margin-bottom: 0; }
 .field--row b, .toggle b { display: block; font-size: 14px; }
-.field--row small, .toggle small { display: block; color: var(--muted); font-size: 12px; font-weight: 500; }
 
 .toggle input {
   appearance: none; flex: none; position: relative; cursor: pointer;
@@ -529,9 +534,14 @@ html { scrollbar-gutter: stable; }
 .tt-note--period::before { content: "⏳"; }
 
 /* Lektionen mit Kurslink: klickbar, öffnen den OpenOLAT-Kurs */
-a.tt-lesson { color: inherit; text-decoration: none; cursor: pointer; transition: box-shadow .15s ease, transform .15s ease; }
-a.tt-lesson:hover { box-shadow: 0 2px 10px rgba(40, 60, 55, .14); transform: translateY(-1px); z-index: 4; }
-a.tt-lesson:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; z-index: 4; }
+button.tt-lesson {
+  width: 100%; margin: 0; border-top: 0; border-right: 0; border-bottom: 0; /* nur der farbige Rand links bleibt */
+  font: inherit; color: inherit; text-align: left; cursor: pointer;
+  transition: box-shadow .15s ease, transform .15s ease;
+}
+button.tt-lesson:hover { box-shadow: 0 2px 10px rgba(40, 60, 55, .14); transform: translateY(-1px); z-index: 4; }
+button.tt-lesson:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; z-index: 4; }
+button.tt-lesson[aria-expanded="true"] { box-shadow: 0 0 0 2px var(--accent); z-index: 4; }
 .tt-lesson__room--changed { color: var(--warn-text); font-weight: 700; }
 .tt-lesson__room--changed::after { content: " ↻"; }
 .tt-lesson__badge--online { background: var(--accent); color: var(--on-accent); }
@@ -541,9 +551,8 @@ a.tt-lesson:focus-visible { outline: 2px solid var(--accent); outline-offset: 2p
 .tt-empty--holiday span { color: var(--muted); }
 
 /* Fächer */
-.subjects { padding-top: 24px; max-width: 1100px; }
-.subjects__head h2 { margin: 0; font-size: 22px; font-weight: 600; }
-.subjects__head p { margin: 4px 0 16px; color: var(--muted); font-size: 14px; }
+.subjects { padding-top: 28px; max-width: 1100px; }
+
 .subject-cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); gap: 12px; }
 .subject-card {
   --h: 0;
@@ -582,6 +591,46 @@ a.tt-lesson:focus-visible { outline: 2px solid var(--accent); outline-offset: 2p
 /* Laufender Zeitraum (z. B. Abgabewoche) unter der nächsten Prüfung */
 .hero__period { margin: 10px 0 0; color: var(--muted); font-size: 14px; }
 .hero__period strong { color: var(--text); font-weight: 600; }
+
+/* Detailfeld zu einer Lektion: am Computer neben der Lektion, auf dem Handy am unteren Rand */
+.pop {
+  --h: 0;
+  position: fixed; z-index: 40; width: 300px; max-width: calc(100vw - 24px);
+  padding: 16px; border-radius: var(--radius);
+  border: 1px solid var(--line); border-top: 4px solid hsl(var(--h) 50% 55%);
+  background: var(--surface); color: var(--text);
+  box-shadow: 0 12px 40px rgba(20, 30, 28, .18);
+}
+.pop[hidden] { display: none; }
+.pop:focus { outline: none; }
+.pop__head { display: flex; align-items: flex-start; justify-content: space-between; gap: 10px; margin-bottom: 10px; }
+.pop__title { margin: 0; font-size: 18px; font-weight: 700; line-height: 1.25; }
+.pop__course { margin: 2px 0 0; color: var(--muted); font-size: 13px; font-weight: 500; }
+.pop__close {
+  flex: none; width: 30px; height: 30px; border: 0; border-radius: 50%;
+  background: var(--surface-2); color: var(--text); font: inherit; font-size: 13px; cursor: pointer;
+}
+.pop__close:hover { background: var(--accent-soft); }
+.pop__exam {
+  display: flex; flex-direction: column; gap: 1px; margin-bottom: 10px; padding: 8px 10px;
+  border-radius: 10px; background: var(--warn-bg); color: var(--warn-text); font-size: 12px;
+}
+.pop__exam-label { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: .06em; }
+.pop__exam strong { font-size: 14px; }
+.pop__facts { display: grid; grid-template-columns: auto 1fr; gap: 6px 12px; margin: 0 0 14px; font-size: 13px; }
+.pop__facts dt { color: var(--muted); font-weight: 500; }
+.pop__facts dd { margin: 0; font-weight: 600; }
+.pop__warn { color: var(--warn-text); }
+.pop__open { width: 100%; height: 38px; font-size: 13px; }
+
+@media (max-width: 960px) {
+  .pop {
+    left: 0 !important; right: 0; bottom: 0; top: auto !important; width: auto; max-width: none;
+    padding: 18px 20px calc(18px + env(safe-area-inset-bottom));
+    border-radius: 18px 18px 0 0; border-left: 0; border-right: 0; border-bottom: 0;
+    box-shadow: 0 -10px 40px rgba(20, 30, 28, .22);
+  }
+}
 
 .foot { color: var(--muted); font-size: 12px; padding-top: 48px; padding-bottom: 32px; }
 

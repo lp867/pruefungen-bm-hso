@@ -24,7 +24,7 @@
         </button>
         <div>
           <h1>Prüfungen <em>BM</em></h1>
-          <p class="brand__sub">Klasse EFZBMZHH25 · inoffizielle Übersicht, kein Angebot der HSO</p>
+          <p class="brand__sub">Klasse EFZBMZHH25</p>
         </div>
       </div>
     </div>
@@ -79,10 +79,6 @@
 
   <!-- Fächer: alle OpenOLAT-Kurse des Semesters mit nächster Lektion, Restlektionen und nächster Prüfung -->
   <main class="wrap subjects" data-panel="faecher" hidden>
-    <div class="subjects__head">
-      <h2>Fächer</h2>
-      <p>Alle Kurse dieses Semesters. Ein Klick öffnet den Kurs direkt in OpenOLAT.</p>
-    </div>
     <div id="subject-cards" class="subject-cards"></div>
   </main>
 
@@ -90,99 +86,156 @@
     <span id="source"></span>
   </footer>
 
-  <!-- Einstellungen & Infos (öffnet über die zwei Balken oben links, die dabei zum X werden) -->
+  <!-- Menü (öffnet über die zwei Balken oben links, die dabei zum X werden): Einstellungen | Hilfe & Infos -->
   <div id="settings-overlay" class="drawer-overlay"></div>
   <div id="settings" class="drawer" role="dialog" aria-modal="true" aria-labelledby="settings-title" inert>
     <div class="drawer__head">
-      <h2 id="settings-title">Einstellungen</h2>
+      <h2 id="settings-title" class="sr-only">Menü</h2>
+      <div class="seg seg--full drawer__tabs" role="tablist" aria-label="Menü">
+        <button type="button" role="tab" id="tab-settings" data-pane="settings" aria-controls="pane-settings" aria-selected="true">Einstellungen</button>
+        <button type="button" role="tab" id="tab-help" data-pane="help" aria-controls="pane-help" aria-selected="false">Hilfe &amp; Infos</button>
+      </div>
     </div>
 
     <div class="drawer__body">
-      <section class="drawer__sec">
-        <h3>Darstellung</h3>
-        <div class="field">
-          <span class="field__label">Design</span>
-          <div class="seg seg--full" id="set-theme" role="group" aria-label="Design">
-            <button type="button" data-value="system">System</button>
-            <button type="button" data-value="light">Hell</button>
-            <button type="button" data-value="dark">Dunkel</button>
+      <!-- Tab 1: nur Bedienelemente, Erklärungen stehen unter "Hilfe & Infos" -->
+      <div id="pane-settings" class="drawer__pane" role="tabpanel" aria-labelledby="tab-settings">
+        <section class="drawer__sec">
+          <h3>Darstellung</h3>
+          <div class="field">
+            <span class="field__label">Design</span>
+            <div class="seg seg--full" id="set-theme" role="group" aria-label="Design">
+              <button type="button" data-value="system">System</button>
+              <button type="button" data-value="light">Hell</button>
+              <button type="button" data-value="dark">Dunkel</button>
+            </div>
           </div>
-        </div>
-        <label class="toggle">
-          <span><b>Kompakte Liste</b><small>Beschreibungen und Labels ausblenden</small></span>
-          <input type="checkbox" id="set-compact">
-        </label>
-        <label class="toggle">
-          <span><b>Sekunden im Countdown</b><small>Countdown läuft sekundengenau</small></span>
-          <input type="checkbox" id="set-seconds">
-        </label>
-      </section>
+          <label class="toggle"><b>Kompakte Liste</b><input type="checkbox" id="set-compact"></label>
+          <label class="toggle"><b>Sekunden im Countdown</b><input type="checkbox" id="set-seconds"></label>
+        </section>
 
-      <section class="drawer__sec">
-        <h3>Liste</h3>
-        <div class="field">
-          <span class="field__label">Startansicht</span>
-          <div class="seg seg--full" id="set-range" role="group" aria-label="Startansicht">
-            <button type="button" data-value="upcoming">Kommend</button>
-            <button type="button" data-value="past">Vergangen</button>
-            <button type="button" data-value="all">Alle</button>
+        <section class="drawer__sec">
+          <h3>Liste</h3>
+          <div class="field">
+            <span class="field__label">Startansicht</span>
+            <div class="seg seg--full" id="set-range" role="group" aria-label="Startansicht">
+              <button type="button" data-value="upcoming">Kommend</button>
+              <button type="button" data-value="past">Vergangen</button>
+              <button type="button" data-value="all">Alle</button>
+            </div>
           </div>
-        </div>
-        <label class="field field--row" for="set-soon">
-          <span><b>Hervorheben ab</b><small>Prüfungen, die bald anstehen</small></span>
-          <select id="set-soon" class="select">
-            <option value="1">1 Tag vorher</option>
-            <option value="3">3 Tage vorher</option>
-            <option value="7">1 Woche vorher</option>
-            <option value="14">2 Wochen vorher</option>
-          </select>
-        </label>
-      </section>
+          <label class="field field--row" for="set-soon">
+            <b>Hervorheben ab</b>
+            <select id="set-soon" class="select">
+              <option value="1">1 Tag vorher</option>
+              <option value="3">3 Tage vorher</option>
+              <option value="7">1 Woche vorher</option>
+              <option value="14">2 Wochen vorher</option>
+            </select>
+          </label>
+        </section>
 
-      <section class="drawer__sec">
-        <h3>Kalender</h3>
-        <div class="drawer__actions">
-          <a id="subscribe-2" class="btn" target="_blank" rel="noopener">Kalender abonnieren</a>
-          <button id="reload" class="btn btn--ghost" type="button">Daten neu laden</button>
-        </div>
-        <p class="hint">Mit „Abonnieren“ erscheinen alle Prüfungen automatisch in deinem eigenen Google-Kalender.</p>
-
-        <div class="field ical">
-          <label class="field__label" for="ical-url">Link für andere Kalender-Apps</label>
-          <div class="ical__row">
-            <input id="ical-url" class="ical__input" type="text" readonly>
-            <button id="ical-copy" class="btn" type="button">Kopieren</button>
+        <section class="drawer__sec">
+          <h3>Kalender</h3>
+          <div class="drawer__actions">
+            <a id="subscribe-2" class="btn" target="_blank" rel="noopener">Kalender abonnieren</a>
+            <button id="reload" class="btn btn--ghost" type="button">Daten neu laden</button>
           </div>
-        </div>
-        <details class="howto">
-          <summary>So fügst du den Link ein</summary>
-          <ul>
-            <li><b>iPhone:</b> Einstellungen → Kalender → Accounts → Account hinzufügen → Andere → Kalenderabo hinzufügen → Link einfügen.</li>
-            <li><b>Outlook:</b> Kalender → Kalender hinzufügen → Aus dem Internet abonnieren → Link einfügen.</li>
-            <li><b>Android / andere:</b> „Kalender aus URL“ oder „Internetkalender“ wählen → Link einfügen.</li>
-          </ul>
-        </details>
-      </section>
+          <div class="field ical">
+            <label class="field__label" for="ical-url">Link für andere Kalender-Apps</label>
+            <div class="ical__row">
+              <input id="ical-url" class="ical__input" type="text" readonly>
+              <button id="ical-copy" class="btn" type="button">Kopieren</button>
+            </div>
+          </div>
+        </section>
+      </div>
 
-      <section class="drawer__sec">
-        <h3>Infos</h3>
-        <dl class="facts" id="facts"></dl>
-        <details class="howto">
-          <summary>So trägst du eine Prüfung ein</summary>
-          <ul>
-            <li>Termin im Google-Kalender <b>„Prüfungen BM (von Elias)“</b> erstellen.</li>
-            <li>Das <b>Fach</b> im Titel nennen, z. B. „Mathe Prüfung“ oder „T&amp;U Prüfung“.</li>
-            <li>Wörter wie <b>Abgabe</b>, <b>Frist</b>, <b>Nachprüfung</b>, <b>Kurztest</b> oder <b>Vortrag</b> erzeugen ein Zusatz-Label.</li>
-            <li>Wird das Fach falsch erkannt, in die Beschreibung eine Zeile <b>Fach: Deutsch</b> schreiben (ebenso <b>Typ: Kurztest</b>).</li>
-            <li>Steht nur die Woche fest: ganztägigen Zeitraum eintragen und in die Beschreibung <b>genaue Tage offen</b> schreiben.</li>
-            <li><b>Ort</b> (Zimmer) und <b>Beschreibung</b> (z. B. Themen) werden mit angezeigt.</li>
-          </ul>
-        </details>
-        <p class="hint">Einträge ändern können nur Elias und freigegebene Personen. Bei Fragen oder fehlenden Prüfungen wende dich an Elias.</p>
-        <p class="hint">Ein Projekt von Elias für die BM an der HSO. Kein offizielles Angebot der HSO.</p>
-      </section>
+      <!-- Tab 2: alle Erklärungen gesammelt -->
+      <div id="pane-help" class="drawer__pane" role="tabpanel" aria-labelledby="tab-help" hidden>
+        <section class="drawer__sec">
+          <h3>Status</h3>
+          <dl class="facts" id="facts"></dl>
+        </section>
+
+        <section class="drawer__sec">
+          <h3>Ansichten</h3>
+          <details class="howto">
+            <summary>Prüfungen</summary>
+            <ul>
+              <li>Oben steht die <b>nächste Prüfung</b> mit Countdown. Laufende Zeiträume (z. B. Abgabewochen) stehen darunter.</li>
+              <li><b>Kommend / Vergangen / Alle</b> filtern die Liste, die Zahlen zeigen die Anzahl Einträge. Darunter lässt sich nach Fach filtern.</li>
+              <li>Labels: <b>Nachprüfung</b>, <b>Abgabe / Frist</b>, <b>Zeitraum</b> für mehrtägige Einträge und <b>Datum offen</b>, wenn der genaue Tag noch nicht feststeht.</li>
+              <li><b>„2 Prüfungen an diesem Tag“</b> warnt vor Tagen mit mehreren Prüfungen.</li>
+            </ul>
+          </details>
+          <details class="howto">
+            <summary>Stundenplan</summary>
+            <ul>
+              <li><b>Lektion antippen</b> öffnet die Details zur Stunde, mit Link zum OpenOLAT-Kurs.</li>
+              <li>Mit <b>‹ ›</b> oder den Pfeiltasten blätterst du durch die Wochen, <b>Heute</b> springt zurück.</li>
+              <li>Prüfungen erscheinen <b>bernsteinfarben</b> direkt auf der Lektion, in der sie stattfinden.</li>
+              <li><b>↻</b> markiert einen Zimmerwechsel (anderes Zimmer als sonst zu dieser Zeit), <b>Online</b> eine Online-Lektion.</li>
+              <li><b>Ferien</b> werden aus Lücken im Stundenplan erkannt (ab 5 Schultagen ohne Lektion). Es ist keine offizielle Ferienliste.</li>
+              <li>Die grüne Linie zeigt die aktuelle Uhrzeit.</li>
+            </ul>
+          </details>
+          <details class="howto">
+            <summary>Fächer</summary>
+            <ul>
+              <li>Alle laufenden Kurse dieses Semesters mit nächster Lektion, verbleibenden Lektionen bis Semesterende und der nächsten Prüfung im Fach.</li>
+              <li><b>In OpenOLAT öffnen</b> führt direkt zum Kurs (Login nötig).</li>
+            </ul>
+          </details>
+        </section>
+
+        <section class="drawer__sec">
+          <h3>Einstellungen erklärt</h3>
+          <details class="howto">
+            <summary>Darstellung &amp; Liste</summary>
+            <ul>
+              <li><b>Kompakte Liste</b> blendet Beschreibungen und Labels aus. Warnungen bleiben sichtbar.</li>
+              <li><b>Sekunden im Countdown</b> lässt den Countdown sekundengenau laufen.</li>
+              <li><b>Startansicht</b> legt fest, welcher Filter beim Öffnen aktiv ist.</li>
+              <li><b>Hervorheben ab</b> bestimmt, ab wann eine Prüfung als „bald“ markiert wird.</li>
+            </ul>
+          </details>
+          <details class="howto">
+            <summary>Kalender abonnieren</summary>
+            <ul>
+              <li><b>Kalender abonnieren</b> fügt alle Prüfungen deinem Google-Kalender hinzu. Sie aktualisieren sich dort automatisch.</li>
+              <li>Für andere Apps den <b>Link kopieren</b> und einfügen:</li>
+              <li><b>iPhone:</b> Einstellungen → Kalender → Accounts → Account hinzufügen → Andere → Kalenderabo hinzufügen.</li>
+              <li><b>Outlook:</b> Kalender → Kalender hinzufügen → Aus dem Internet abonnieren.</li>
+              <li><b>Android / andere:</b> „Kalender aus URL“ oder „Internetkalender“ wählen.</li>
+              <li><b>Daten neu laden</b> holt Prüfungen und Stundenplan sofort neu.</li>
+            </ul>
+          </details>
+          <details class="howto">
+            <summary>So trägst du eine Prüfung ein</summary>
+            <ul>
+              <li>Termin im Google-Kalender <b>„Prüfungen BM (von Elias)“</b> erstellen.</li>
+              <li>Das <b>Fach</b> im Titel nennen, z. B. „Mathe Prüfung“ oder „T+U Prüfung“.</li>
+              <li>Wörter wie <b>Abgabe</b>, <b>Frist</b>, <b>Nachprüfung</b>, <b>Kurztest</b> oder <b>Vortrag</b> erzeugen ein Label.</li>
+              <li>Fach falsch erkannt? In die Beschreibung eine Zeile <b>Fach: Deutsch</b> schreiben (ebenso <b>Typ: Kurztest</b>).</li>
+              <li>Steht nur die Woche fest: ganztägigen Zeitraum eintragen und <b>genaue Tage offen</b> in die Beschreibung schreiben.</li>
+              <li>Vorträge als <b>„Vortrag: Thema“</b> eintragen, ohne Namen, weil die Seite öffentlich ist.</li>
+            </ul>
+          </details>
+        </section>
+
+        <section class="drawer__sec">
+          <h3>Über diese Seite</h3>
+          <p class="hint">Ein Projekt von Elias für die Klasse EFZBMZHH25. Kein offizielles Angebot der HSO.</p>
+          <p class="hint">Einträge ändern können nur Elias und freigegebene Personen. Bei Fragen oder fehlenden Prüfungen wende dich an Elias.</p>
+          <p class="hint">Der Stundenplan stammt aus OpenOLAT (nur Zeit, Fach, Zimmer und Kurs, keine Namen von Lehrpersonen).</p>
+        </section>
+      </div>
     </div>
   </div>
+
+  <!-- Detailfeld zu einer Lektion (wird von app.js gefüllt) -->
+  <div id="lesson-pop" class="pop" role="dialog" aria-labelledby="pop-title" tabindex="-1" hidden></div>
 
   <script src="config.js"></script>
   <script src="app.js"></script>

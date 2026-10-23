@@ -525,6 +525,7 @@
   let view = "pruefungen";
 
   function setView(next) {
+    if (typeof closeLesson === "function") closeLesson();
     const previous = view;
     view = VIEWS.includes(next) ? next : "pruefungen";
     document.querySelectorAll("[data-panel]").forEach((el) => { el.hidden = el.dataset.panel !== view; });
@@ -781,26 +782,22 @@
       const lessonHtml = lessons.map((l) => {
         const len = (l.end - l.start) / 60000;
         const ex = onLesson.get(l) || [];
+        l.exams = ex; // für das Detailfeld
         const cls = (l.end <= now ? " tt-lesson--past" : l.start <= now ? " tt-lesson--now" : "") +
-          (len < 60 ? " tt-lesson--short" : "") + (ex.length ? " tt-lesson--exam" : "") + (l.url ? " tt-lesson--link" : "");
+          (len < 60 ? " tt-lesson--short" : "") + (ex.length ? " tt-lesson--exam" : "");
         const examInfo = ex.length
           ? `<span class="tt-lesson__badge">${examLabel(ex[0])}</span><span class="tt-lesson__exam">${esc(ex.map((e) => e.title).join(", "))}</span>`
           : l.online ? `<span class="tt-lesson__badge tt-lesson__badge--online">Online</span>` : "";
         const room = [l.room, l.note].filter(Boolean).join(" · ");
-        const tip = [
-          ex.length ? `${examLabel(ex[0])}: ${ex.map((e) => e.title).join(", ")}` : "",
-          l.usualRoom ? `Zimmerwechsel: ${l.room} statt ${l.usualRoom}` : "",
-          l.url ? "Klicken, um den Kurs in OpenOLAT zu öffnen" : "",
-        ].filter(Boolean).join("\n");
-        // Mit Kurslink wird die Lektion zum Link, der den OpenOLAT-Kurs in einem neuen Tab öffnet
-        const tag = l.url ? "a" : "div";
-        const link = l.url ? ` href="${esc(l.url)}" target="_blank" rel="noopener"` : "";
-        return `<${tag} class="tt-lesson${cls}"${link} style="--h:${l.color};--top:${minutes(l.start) - from};--len:${len}"${tip ? ` title="${esc(tip)}"` : ""}>
+        // Antippen öffnet das Detailfeld (mit Link zum OpenOLAT-Kurs)
+        const key = lessonKey(l);
+        const open = pop.key === key ? ` aria-expanded="true"` : ` aria-expanded="false"`;
+        return `<button type="button" class="tt-lesson${cls}" data-lesson="${esc(key)}" aria-haspopup="dialog"${open} style="--h:${l.color};--top:${minutes(l.start) - from};--len:${len}">
             <span class="tt-lesson__time">${esc(timeRange(l.start, l.end))}</span>
             <span class="tt-lesson__subject">${esc(l.subject)}</span>
             ${examInfo}
             ${room ? `<span class="tt-lesson__room${l.usualRoom ? " tt-lesson__room--changed" : ""}">${esc(room)}</span>` : ""}
-          </${tag}>`;
+          </button>`;
       }).join("");
       const brk = !lessons.length && date.getDay() >= 1 && date.getDay() <= 5 ? breakOf(date) : null;
       const freeText = brk ? (brk.holiday ? "Ferien 🌿" : "kein Unterricht") : "frei";
@@ -918,12 +915,135 @@
     }).join("");
   }
 
+  // ---------- Detailfeld zu einer Lektion ----------
+
+  const pop = { key: null, anchor: null };
+  const lessonKey = (l) => `${l.start.getTime()}|${l.course || l.subject}`;
+
+  function openLesson(button) {
+    const l = tt.lessons.find((x) => lessonKey(x) === button.dataset.lesson);
+    if (!l) return;
+    const box = $("lesson-pop");
+    const now = new Date();
+    const course = tt.courses[l.course];
+    const count = lessonCount(l);
+    const state_ = l.end <= now ? "vorbei" : l.start <= now ? `läuft gerade, bis ${fmt.time.format(l.end)}` : inDays(dayDiff(now, l.start));
+    const row = (k, v) => (v ? `<dt>${esc(k)}</dt><dd>${v}</dd>` : "");
+    const exams = (l.exams || []).map((e) =>
+      `<div class="pop__exam"><span class="pop__exam-label">${esc(e.kind && /Abgabe|Frist/.test(e.kind) ? "Abgabe" : "Prüfung")}</span><strong>${esc(e.title)}</strong>${e.description ? `<span>${esc(e.description.slice(0, 200))}</span>` : ""}</div>`
+    ).join("");
+
+    box.style.setProperty("--h", l.color);
+    box.innerHTML = `
+      <div class="pop__head">
+        <div>
+          <h3 id="pop-title" class="pop__title">${esc(l.subject)}</h3>
+          ${course && courseName(course.title) !== l.subject ? `<p class="pop__course">${esc(courseName(course.title))}</p>` : ""}
+        </div>
+        <button type="button" class="pop__close" aria-label="Details schliessen">✕</button>
+      </div>
+      ${exams}
+      <dl class="pop__facts">
+        ${row("Wann", `${esc(fmt.full.format(l.start))}<br>${esc(timeRange(l.start, l.end))} · ${count} ${count === 1 ? "Lektion" : "Lektionen"}`)}
+        ${row("Status", esc(state_))}
+        ${row("Zimmer", l.online ? "Online" : l.room ? `${esc(l.room)}${l.usualRoom ? ` <span class="pop__warn">↻ sonst ${esc(l.usualRoom)}</span>` : ""}` : "")}
+        ${row("Hinweis", l.note ? esc(l.note) : "")}
+      </dl>
+      ${l.url ? `<a class="btn pop__open" href="${esc(l.url)}" target="_blank" rel="noopener">In OpenOLAT öffnen ↗</a>` : ""}`;
+
+    if (pop.anchor) pop.anchor.setAttribute("aria-expanded", "false");
+    pop.key = button.dataset.lesson;
+    pop.anchor = button;
+    button.setAttribute("aria-expanded", "true");
+    box.hidden = false;
+    placePopover(button);
+    animate(box, [{ opacity: 0, transform: "translateY(6px) scale(.98)" }, { opacity: 1, transform: "none" }], 180);
+    box.focus({ preventScroll: true });
+  }
+
+  // Am Computer neben der Lektion, auf schmalen Bildschirmen als Feld am unteren Rand (per CSS)
+  function placePopover(button) {
+    const box = $("lesson-pop");
+    if (matchMedia("(max-width: 960px)").matches) {
+      box.style.left = box.style.top = "";
+      return;
+    }
+    const r = button.getBoundingClientRect();
+    const w = box.offsetWidth;
+    const h = box.offsetHeight;
+    const gap = 10;
+    let left = r.right + gap;
+    if (left + w > innerWidth - 12) left = r.left - gap - w; // rechts kein Platz: links daneben
+    left = Math.max(12, Math.min(left, innerWidth - w - 12));
+    const top = Math.max(12, Math.min(r.top, innerHeight - h - 12));
+    box.style.left = `${left}px`;
+    box.style.top = `${top}px`;
+  }
+
+  function closeLesson({ restoreFocus = false } = {}) {
+    const box = $("lesson-pop");
+    if (box.hidden) return;
+    box.hidden = true;
+    const key = pop.key;
+    pop.key = null;
+    if (pop.anchor) pop.anchor.setAttribute("aria-expanded", "false");
+    pop.anchor = null;
+    // Fokus zurück auf die Lektion (falls sie inzwischen neu gezeichnet wurde: auf die neue)
+    if (restoreFocus && key) {
+      const btn = [...document.querySelectorAll(".tt-lesson")].find((b) => b.dataset.lesson === key);
+      if (btn) btn.focus({ preventScroll: true });
+    }
+  }
+
+  function initLessonPopover() {
+    $("tt-week").addEventListener("click", (ev) => {
+      const btn = ev.target.closest(".tt-lesson");
+      if (!btn) return;
+      if (pop.key === btn.dataset.lesson && !$("lesson-pop").hidden) closeLesson();
+      else openLesson(btn);
+    });
+    $("lesson-pop").addEventListener("click", (ev) => {
+      if (ev.target.closest(".pop__close")) closeLesson({ restoreFocus: true });
+    });
+    // Klick daneben schliesst
+    document.addEventListener("click", (ev) => {
+      if (!(ev.target.closest && ev.target.closest("#lesson-pop, .tt-lesson"))) closeLesson();
+    });
+    document.addEventListener("keydown", (ev) => {
+      if (ev.key === "Escape" && !$("lesson-pop").hidden) closeLesson({ restoreFocus: true });
+    });
+    // Beim Scrollen/Verkleinern am Computer schliessen, damit das Feld nicht losgelöst herumsteht
+    window.addEventListener("resize", () => closeLesson());
+    window.addEventListener("scroll", () => {
+      if (!matchMedia("(max-width: 960px)").matches) closeLesson();
+    }, { passive: true });
+  }
+
+  // ---------- Menü-Tabs: Einstellungen | Hilfe & Infos ----------
+
+  function initDrawerTabs() {
+    const tabs = [...document.querySelectorAll(".drawer__tabs [role=tab]")];
+    tabs.forEach((tab) => tab.addEventListener("click", () => {
+      if (tab.getAttribute("aria-selected") === "true") return;
+      const dir = tabs.indexOf(tab) > tabs.findIndex((t) => t.getAttribute("aria-selected") === "true") ? 1 : -1;
+      tabs.forEach((t) => {
+        const active = t === tab;
+        t.setAttribute("aria-selected", String(active));
+        $(`pane-${t.dataset.pane}`).hidden = !active;
+      });
+      const pane = $(`pane-${tab.dataset.pane}`);
+      pane.parentElement.scrollTop = 0;
+      animate(pane, [{ opacity: 0, transform: `translateX(${dir * 20}px)` }, { opacity: 1, transform: "none" }], 260);
+    }));
+  }
+
   function initTimetable() {
     // Woche wechseln: alte Woche gleitet hinaus, neue kommt aus der Blätterrichtung herein
     let moving = Promise.resolve();
     const move = (delta) => {
       const target = delta === 0 ? 0 : tt.offset + delta;
       if (target === tt.offset) return;
+      closeLesson();
       const dir = target > tt.offset ? 1 : -1;
       tt.offset = target;
       const parts = [$("tt-week"), $("tt-label")];
@@ -938,7 +1058,7 @@
     $("tt-today").addEventListener("click", () => move(0));
     // Pfeiltasten wechseln die Woche, solange der Stundenplan offen ist und nicht getippt wird
     document.addEventListener("keydown", (ev) => {
-      if (view !== "stundenplan" || ev.target.closest("input, select, textarea") || document.body.classList.contains("menu-open")) return;
+      if (view !== "stundenplan" || (ev.target.closest && ev.target.closest("input, select, textarea")) || document.body.classList.contains("menu-open")) return;
       if (ev.key === "ArrowLeft") move(-1);
       if (ev.key === "ArrowRight") move(1);
     });
@@ -1163,6 +1283,8 @@
   initIndicators();
   initControls();
   initTimetable();
+  initLessonPopover();
+  initDrawerTabs();
   setRange(["upcoming", "past", "all"].includes(state.range) ? state.range : "upcoming");
   initViews();
   refresh();
