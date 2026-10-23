@@ -85,12 +85,13 @@
     return { subject, kind };
   }
 
-  function makeEvent({ id, title, start, end, allDay, location, description }) {
+  function makeEvent({ id, title, start, end, allDay, location, description, link }) {
     title = (title || "Ohne Titel").trim();
     description = description || "";
     if (!end || end <= start) end = new Date(start.getTime() + (allDay ? DAY : 60 * 60 * 1000));
     return {
       id, title, start, end, allDay, location: location || "", description,
+      link: /^https:\/\/www\.google\.com\/calendar\/event\?eid=[\w-]+$/.test(link || "") ? link : "",
       ...classify(title, description),
       // Mehrtägiger Zeitraum (z. B. Abgabewoche): wird getrennt von der "nächsten Prüfung" behandelt
       period: allDay && end - start > DAY + 3600000,
@@ -148,6 +149,7 @@
           end: allDay ? parseDate(e.end.date) : new Date(e.end.dateTime),
           location: e.location,
           description: stripHtml(e.description || ""),
+          link: e.htmlLink,
         });
       });
   }
@@ -170,8 +172,8 @@
   const CACHE_KEY = "pruefungen:cache";
   function saveCache(events) {
     try {
-      const raw = events.map(({ id, title, start, end, allDay, location, description }) =>
-        ({ id, title, start: start.toISOString(), end: end.toISOString(), allDay, location, description }));
+      const raw = events.map(({ id, title, start, end, allDay, location, description, link }) =>
+        ({ id, title, start: start.toISOString(), end: end.toISOString(), allDay, location, description, link }));
       localStorage.setItem(CACHE_KEY, JSON.stringify({ savedAt: new Date().toISOString(), events: raw }));
     } catch { /* Speicher voll oder gesperrt: dann eben ohne Zwischenspeicher */ }
   }
@@ -302,7 +304,7 @@
       <div class="hero__grid">
         <div>
           <p class="hero__label">${running ? "Läuft gerade" : "Nächste Prüfung"} · ${esc(next.subject.name)}</p>
-          <h2 class="hero__title">${esc(next.title)}</h2>
+          <h2 class="hero__title"><button type="button" class="hero__open" data-pop="${esc(examKey(next))}" aria-haspopup="dialog" aria-expanded="${pop.key === examKey(next)}">${esc(next.title)}</button></h2>
           <p class="hero__meta">
             <span>${esc(fmt.full.format(next.start))}</span>
             <span>${esc(timeLabel(next))}</span>
@@ -407,17 +409,18 @@
       e.vague ? `<span class="tag tag--warn" title="Der genaue Tag steht noch nicht fest">Datum offen</span>` : "",
       e.sameDay ? `<span class="tag tag--warn" title="${esc(e.sameDayTitles.join(", "))}">${esc(conflictLabel(e))}</span>` : "",
     ].join("");
+    const key = examKey(e);
     return `
-      <article class="row${past ? " row--past" : ""}" style="--h:${e.subject.hue}">
-        <div class="row__date"><span class="row__day">${e.start.getDate()}</span><span class="row__wd">${esc(fmt.weekdayShort.format(e.start).replace(".", ""))}</span></div>
-        <div class="row__main">
-          <h4 class="row__title">${esc(e.title)}</h4>
-          <p class="row__meta"><span class="row__subject">${esc(e.subject.name)}</span>${meta}</p>
-          ${e.description ? `<p class="row__desc">${esc(e.description)}</p>` : ""}
-          ${tags ? `<div class="tags">${tags}</div>` : ""}
-        </div>
-        <div class="when${soon ? " when--soon" : ""}">${esc(relLabel(e, now))}</div>
-      </article>`;
+      <button type="button" class="row${past ? " row--past" : ""}" data-pop="${esc(key)}" aria-haspopup="dialog" aria-expanded="${pop.key === key}" style="--h:${e.subject.hue}">
+        <span class="row__date"><span class="row__day">${e.start.getDate()}</span><span class="row__wd">${esc(fmt.weekdayShort.format(e.start).replace(".", ""))}</span></span>
+        <span class="row__main">
+          <span class="row__title">${esc(e.title)}</span>
+          <span class="row__meta"><span class="row__subject">${esc(e.subject.name)}</span>${meta}</span>
+          ${e.description ? `<span class="row__desc">${esc(e.description)}</span>` : ""}
+          ${tags ? `<span class="tags">${tags}</span>` : ""}
+        </span>
+        <span class="when${soon ? " when--soon" : ""}">${esc(relLabel(e, now))}</span>
+      </button>`;
   }
 
   function render() {
@@ -525,7 +528,7 @@
   let view = "pruefungen";
 
   function setView(next) {
-    if (typeof closeLesson === "function") closeLesson();
+    if (typeof closePopover === "function") closePopover();
     const previous = view;
     view = VIEWS.includes(next) ? next : "pruefungen";
     document.querySelectorAll("[data-panel]").forEach((el) => { el.hidden = el.dataset.panel !== view; });
@@ -791,8 +794,8 @@
         const room = [l.room, l.note].filter(Boolean).join(" · ");
         // Antippen öffnet das Detailfeld (mit Link zum OpenOLAT-Kurs)
         const key = lessonKey(l);
-        const open = pop.key === key ? ` aria-expanded="true"` : ` aria-expanded="false"`;
-        return `<button type="button" class="tt-lesson${cls}" data-lesson="${esc(key)}" aria-haspopup="dialog"${open} style="--h:${l.color};--top:${minutes(l.start) - from};--len:${len}">
+        const flash = tt.flash && ex.some((e) => examKey(e) === tt.flash) ? " tt-lesson--flash" : "";
+        return `<button type="button" class="tt-lesson${cls}${flash}" data-pop="${esc(key)}" aria-haspopup="dialog" aria-expanded="${pop.key === key}" style="--h:${l.color};--top:${minutes(l.start) - from};--len:${len}">
             <span class="tt-lesson__time">${esc(timeRange(l.start, l.end))}</span>
             <span class="tt-lesson__subject">${esc(l.subject)}</span>
             ${examInfo}
@@ -915,72 +918,155 @@
     }).join("");
   }
 
-  // ---------- Detailfeld zu einer Lektion ----------
+  // ---------- Detailfeld (Lektionen im Stundenplan und Prüfungen) ----------
 
   const pop = { key: null, anchor: null };
-  const lessonKey = (l) => `${l.start.getTime()}|${l.course || l.subject}`;
+  const lessonKey = (l) => `lesson|${l.start.getTime()}|${l.course || l.subject}`;
+  const examKey = (e) => `exam|${e.id || e.title}|${e.start.getTime()}`;
+  const factRow = (k, v) => (v ? `<dt>${esc(k)}</dt><dd>${v}</dd>` : "");
 
-  function openLesson(button) {
-    const l = tt.lessons.find((x) => lessonKey(x) === button.dataset.lesson);
-    if (!l) return;
+  // Öffnet das Detailfeld neben dem angetippten Element (am Handy: unten)
+  function showPopover(anchor, key, hue, html) {
     const box = $("lesson-pop");
-    const now = new Date();
-    const course = tt.courses[l.course];
-    const count = lessonCount(l);
-    const state_ = l.end <= now ? "vorbei" : l.start <= now ? `läuft gerade, bis ${fmt.time.format(l.end)}` : inDays(dayDiff(now, l.start));
-    const row = (k, v) => (v ? `<dt>${esc(k)}</dt><dd>${v}</dd>` : "");
-    const exams = (l.exams || []).map((e) =>
-      `<div class="pop__exam"><span class="pop__exam-label">${esc(e.kind && /Abgabe|Frist/.test(e.kind) ? "Abgabe" : "Prüfung")}</span><strong>${esc(e.title)}</strong>${e.description ? `<span>${esc(e.description.slice(0, 200))}</span>` : ""}</div>`
-    ).join("");
-
-    box.style.setProperty("--h", l.color);
-    box.innerHTML = `
-      <div class="pop__head">
-        <div>
-          <h3 id="pop-title" class="pop__title">${esc(l.subject)}</h3>
-          ${course && courseName(course.title) !== l.subject ? `<p class="pop__course">${esc(courseName(course.title))}</p>` : ""}
-        </div>
-        <button type="button" class="pop__close" aria-label="Details schliessen">✕</button>
-      </div>
-      ${exams}
-      <dl class="pop__facts">
-        ${row("Wann", `${esc(fmt.full.format(l.start))}<br>${esc(timeRange(l.start, l.end))} · ${count} ${count === 1 ? "Lektion" : "Lektionen"}`)}
-        ${row("Status", esc(state_))}
-        ${row("Zimmer", l.online ? "Online" : l.room ? `${esc(l.room)}${l.usualRoom ? ` <span class="pop__warn">↻ sonst ${esc(l.usualRoom)}</span>` : ""}` : "")}
-        ${row("Hinweis", l.note ? esc(l.note) : "")}
-      </dl>
-      ${l.url ? `<a class="btn pop__open" href="${esc(l.url)}" target="_blank" rel="noopener">In OpenOLAT öffnen ↗</a>` : ""}`;
-
+    box.style.setProperty("--h", hue);
+    box.innerHTML = html;
     if (pop.anchor) pop.anchor.setAttribute("aria-expanded", "false");
-    pop.key = button.dataset.lesson;
-    pop.anchor = button;
-    button.setAttribute("aria-expanded", "true");
+    pop.key = key;
+    pop.anchor = anchor;
+    anchor.setAttribute("aria-expanded", "true");
     box.hidden = false;
-    placePopover(button);
+    placePopover(anchor);
     animate(box, [{ opacity: 0, transform: "translateY(6px) scale(.98)" }, { opacity: 1, transform: "none" }], 180);
     box.focus({ preventScroll: true });
   }
 
-  // Am Computer neben der Lektion, auf schmalen Bildschirmen als Feld am unteren Rand (per CSS)
-  function placePopover(button) {
+  const popHead = (title, sub) => `
+      <div class="pop__head">
+        <div>
+          <h3 id="pop-title" class="pop__title">${esc(title)}</h3>
+          ${sub ? `<p class="pop__course">${esc(sub)}</p>` : ""}
+        </div>
+        <button type="button" class="pop__close" aria-label="Details schliessen">✕</button>
+      </div>`;
+
+  function openLesson(button) {
+    const l = tt.lessons.find((x) => lessonKey(x) === button.dataset.pop);
+    if (!l) return;
+    const now = new Date();
+    const course = tt.courses[l.course];
+    const count = lessonCount(l);
+    const status = l.end <= now ? "vorbei" : l.start <= now ? `läuft gerade, bis ${fmt.time.format(l.end)}` : inDays(dayDiff(now, l.start));
+    const exams = (l.exams || []).map((e) =>
+      `<div class="pop__exam"><span class="pop__exam-label">${esc(e.kind && /Abgabe|Frist/.test(e.kind) ? "Abgabe" : "Prüfung")}</span><strong>${esc(e.title)}</strong>${e.description ? `<span>${esc(e.description.slice(0, 200))}</span>` : ""}</div>`
+    ).join("");
+    showPopover(button, button.dataset.pop, l.color, `
+      ${popHead(l.subject, course && courseName(course.title) !== l.subject ? courseName(course.title) : "")}
+      ${exams}
+      <dl class="pop__facts">
+        ${factRow("Wann", `${esc(fmt.full.format(l.start))}<br>${esc(timeRange(l.start, l.end))} · ${count} ${count === 1 ? "Lektion" : "Lektionen"}`)}
+        ${factRow("Status", esc(status))}
+        ${factRow("Zimmer", l.online ? "Online" : l.room ? `${esc(l.room)}${l.usualRoom ? ` <span class="pop__warn">↻ sonst ${esc(l.usualRoom)}</span>` : ""}` : "")}
+        ${factRow("Hinweis", l.note ? esc(l.note) : "")}
+      </dl>
+      <div class="pop__actions">
+        ${l.url ? `<a class="btn pop__open" href="${esc(l.url)}" target="_blank" rel="noopener">In OpenOLAT öffnen ↗</a>` : ""}
+      </div>`);
+  }
+
+  // Kurs, dessen Lektionen zum Fach der Prüfung passen (für den OpenOLAT-Link)
+  function courseForExam(e) {
+    if (!tt.loaded || e.subject === OTHER) return null;
+    const id = Object.keys(tt.courses).find((cid) =>
+      tt.lessons.some((l) => l.course === cid && classify(l.subject).subject === e.subject));
+    return id ? tt.courses[id] : null;
+  }
+
+  function openExam(button) {
+    const e = state.events.find((x) => examKey(x) === button.dataset.pop);
+    if (!e) return;
+    const now = new Date();
+    const lastDay = new Date(e.end - DAY);
+    const when = e.allDay
+      ? (e.period ? `${esc(fmt.full.format(e.start))} bis<br>${esc(fmt.full.format(lastDay))}` : `${esc(fmt.full.format(e.start))}<br>ganztägig`)
+      : `${esc(fmt.full.format(e.start))}<br>${esc(timeLabel(e))}`;
+    // Lektion(en) aus dem Stundenplan, in der die Prüfung stattfindet
+    const lessons = !e.allDay && tt.loaded ? tt.lessons.filter((l) => l.start < e.end && e.start < l.end) : [];
+    const inLesson = lessons.map((l) => `${esc(l.subject)}${l.room ? ` · Zimmer ${esc(l.room)}` : ""}`).join("<br>");
+    const warnings = [
+      e.vague ? "Der genaue Tag steht noch nicht fest." : "",
+      e.sameDay ? `Am selben Tag: ${e.sameDayTitles.join(", ")}` : "",
+    ].filter(Boolean).map((w) => `<p class="pop__note">${esc(w)}</p>`).join("");
+    const course = courseForExam(e);
+    const showable = !e.period && tt.loaded && tt.lessons.length && e.start >= tt.lessons[0].start && e.start <= tt.lessons[tt.lessons.length - 1].end;
+
+    showPopover(button, button.dataset.pop, e.subject.hue, `
+      ${popHead(e.title, [e.subject !== OTHER ? e.subject.name : "", e.kind || (e.period ? "Zeitraum" : "Prüfung")].filter(Boolean).join(" · "))}
+      ${warnings}
+      <dl class="pop__facts">
+        ${factRow("Wann", when)}
+        ${factRow("Status", esc(relLabel(e, now)))}
+        ${factRow("Ort", e.location ? esc(e.location) : "")}
+        ${factRow("Lektion", inLesson)}
+      </dl>
+      ${e.description ? `<p class="pop__desc">${esc(e.description)}</p>` : ""}
+      <div class="pop__actions">
+        ${showable ? `<button type="button" class="btn pop__open" data-show-week="${esc(examKey(e))}">Im Stundenplan zeigen</button>` : ""}
+        ${course ? `<a class="btn btn--ghost pop__open" href="${esc(course.url)}" target="_blank" rel="noopener">Kurs in OpenOLAT ↗</a>` : ""}
+        ${e.link ? `<a class="btn btn--ghost pop__open" href="${esc(e.link)}" target="_blank" rel="noopener">In Google Kalender ↗</a>` : ""}
+      </div>`);
+  }
+
+  // Zur Woche der Prüfung im Stundenplan springen und die Lektion kurz hervorheben
+  function showExamInTimetable(key) {
+    const e = state.events.find((x) => examKey(x) === key);
+    if (!e) return;
+    closePopover();
+    const saved = tt.offset;
+    tt.offset = 0;
+    const base = shownMonday(new Date());
+    tt.offset = saved;
+    tt.offset = Math.round((mondayOf(e.start) - base) / (7 * DAY));
+    tt.flash = key;
+    if (view === "stundenplan") renderTimetable(new Date());
+    else location.hash = "stundenplan";
+    setTimeout(() => {
+      const target = document.querySelector(".tt-lesson--flash");
+      if (target) target.scrollIntoView({ block: "center", behavior: reducedMotion.matches ? "auto" : "smooth" });
+    }, 350);
+    setTimeout(() => {
+      tt.flash = null;
+      document.querySelectorAll(".tt-lesson--flash").forEach((el) => el.classList.remove("tt-lesson--flash"));
+    }, 2600);
+  }
+
+  // Am Computer neben dem Element, sonst darunter/darüber; auf schmalen Bildschirmen am unteren Rand (per CSS)
+  function placePopover(anchor) {
     const box = $("lesson-pop");
     if (matchMedia("(max-width: 960px)").matches) {
       box.style.left = box.style.top = "";
       return;
     }
-    const r = button.getBoundingClientRect();
+    const r = anchor.getBoundingClientRect();
     const w = box.offsetWidth;
     const h = box.offsetHeight;
     const gap = 10;
-    let left = r.right + gap;
-    if (left + w > innerWidth - 12) left = r.left - gap - w; // rechts kein Platz: links daneben
-    left = Math.max(12, Math.min(left, innerWidth - w - 12));
-    const top = Math.max(12, Math.min(r.top, innerHeight - h - 12));
-    box.style.left = `${left}px`;
-    box.style.top = `${top}px`;
+    const fits = (x) => x >= 12 && x + w <= innerWidth - 12;
+    let left;
+    let top;
+    if (fits(r.right + gap)) {
+      left = r.right + gap; top = r.top;
+    } else if (fits(r.left - gap - w)) {
+      left = r.left - gap - w; top = r.top;
+    } else {
+      // Breite Elemente (Prüfungszeilen): unter bzw. über dem Element, rechtsbündig
+      left = r.right - w;
+      top = r.bottom + h + gap <= innerHeight - 12 ? r.bottom + gap : r.top - h - gap;
+    }
+    box.style.left = `${Math.max(12, Math.min(left, innerWidth - w - 12))}px`;
+    box.style.top = `${Math.max(12, Math.min(top, innerHeight - h - 12))}px`;
   }
 
-  function closeLesson({ restoreFocus = false } = {}) {
+  function closePopover({ restoreFocus = false } = {}) {
     const box = $("lesson-pop");
     if (box.hidden) return;
     box.hidden = true;
@@ -988,34 +1074,37 @@
     pop.key = null;
     if (pop.anchor) pop.anchor.setAttribute("aria-expanded", "false");
     pop.anchor = null;
-    // Fokus zurück auf die Lektion (falls sie inzwischen neu gezeichnet wurde: auf die neue)
+    // Fokus zurück auf das angetippte Element (falls es inzwischen neu gezeichnet wurde: auf das neue)
     if (restoreFocus && key) {
-      const btn = [...document.querySelectorAll(".tt-lesson")].find((b) => b.dataset.lesson === key);
-      if (btn) btn.focus({ preventScroll: true });
+      const el = [...document.querySelectorAll("[data-pop]")].find((b) => b.dataset.pop === key);
+      if (el) el.focus({ preventScroll: true });
     }
   }
 
-  function initLessonPopover() {
-    $("tt-week").addEventListener("click", (ev) => {
-      const btn = ev.target.closest(".tt-lesson");
-      if (!btn) return;
-      if (pop.key === btn.dataset.lesson && !$("lesson-pop").hidden) closeLesson();
-      else openLesson(btn);
-    });
-    $("lesson-pop").addEventListener("click", (ev) => {
-      if (ev.target.closest(".pop__close")) closeLesson({ restoreFocus: true });
-    });
-    // Klick daneben schliesst
+  function initPopover() {
+    // Lektionen, Prüfungszeilen und die nächste Prüfung oben öffnen das Detailfeld
     document.addEventListener("click", (ev) => {
-      if (!(ev.target.closest && ev.target.closest("#lesson-pop, .tt-lesson"))) closeLesson();
+      const target = ev.target.closest ? ev.target : null;
+      const trigger = target && target.closest("[data-pop]");
+      const box = $("lesson-pop");
+      if (trigger) {
+        if (pop.key === trigger.dataset.pop && !box.hidden) closePopover();
+        else if (trigger.dataset.pop.startsWith("lesson|")) openLesson(trigger);
+        else openExam(trigger);
+        return;
+      }
+      const show = target && target.closest("[data-show-week]");
+      if (show) return showExamInTimetable(show.dataset.showWeek);
+      if (target && target.closest(".pop__close")) return closePopover({ restoreFocus: true });
+      if (!(target && target.closest("#lesson-pop"))) closePopover(); // Klick daneben schliesst
     });
     document.addEventListener("keydown", (ev) => {
-      if (ev.key === "Escape" && !$("lesson-pop").hidden) closeLesson({ restoreFocus: true });
+      if (ev.key === "Escape" && !$("lesson-pop").hidden) closePopover({ restoreFocus: true });
     });
     // Beim Scrollen/Verkleinern am Computer schliessen, damit das Feld nicht losgelöst herumsteht
-    window.addEventListener("resize", () => closeLesson());
+    window.addEventListener("resize", () => closePopover());
     window.addEventListener("scroll", () => {
-      if (!matchMedia("(max-width: 960px)").matches) closeLesson();
+      if (!matchMedia("(max-width: 960px)").matches) closePopover();
     }, { passive: true });
   }
 
@@ -1043,7 +1132,7 @@
     const move = (delta) => {
       const target = delta === 0 ? 0 : tt.offset + delta;
       if (target === tt.offset) return;
-      closeLesson();
+      closePopover();
       const dir = target > tt.offset ? 1 : -1;
       tt.offset = target;
       const parts = [$("tt-week"), $("tt-label")];
@@ -1283,11 +1372,12 @@
   initIndicators();
   initControls();
   initTimetable();
-  initLessonPopover();
+  initPopover();
   initDrawerTabs();
   setRange(["upcoming", "past", "all"].includes(state.range) ? state.range : "upcoming");
   initViews();
   refresh();
+  loadTimetable({ silent: true });
   setInterval(() => {                             // "heute/morgen", "Jetzt" & Listen aktuell halten
     render();
     if (!state.loaded && view !== "pruefungen") renderTimetableViews(new Date());

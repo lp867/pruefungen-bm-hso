@@ -175,6 +175,14 @@ body {
 .hero__skeleton { color: var(--muted); font-weight: 500; }
 .hero__label { margin: 0 0 8px; font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: .1em; color: var(--accent-strong); }
 .hero__title { margin: 0; font-size: clamp(28px, 6vw, 42px); line-height: 1.15; font-weight: 400; overflow-wrap: anywhere; }
+.hero__open {
+  padding: 0; border: 0; background: none; font: inherit; color: inherit; text-align: left; cursor: pointer;
+  text-decoration: underline; text-decoration-color: transparent; text-underline-offset: 6px; text-decoration-thickness: 2px;
+  transition: text-decoration-color .2s;
+}
+.hero__open:hover, .hero__open[aria-expanded="true"] { text-decoration-color: var(--accent); }
+.hero__open::after { content: " ›"; color: var(--accent); }
+.hero__open:focus-visible { outline: 2px solid var(--accent); outline-offset: 4px; border-radius: 6px; }
 .hero__meta { margin: 12px 0 0; display: flex; flex-wrap: wrap; gap: 6px 20px; font-weight: 500; color: var(--muted); }
 .hero__grid { display: flex; flex-wrap: wrap; align-items: flex-end; justify-content: space-between; gap: 24px; }
 .countdown { display: flex; gap: 8px; }
@@ -241,21 +249,26 @@ body {
 .row {
   --h: 0;
   display: grid; grid-template-columns: 44px 1fr auto; gap: 18px; align-items: start;
-  padding: 14px 10px; border-bottom: 1px solid var(--line);
+  width: 100%; margin: 0; padding: 14px 10px;
+  border: 0; border-bottom: 1px solid var(--line); background: transparent;
+  font: inherit; color: inherit; text-align: left; cursor: pointer;
   transition: background .15s;
 }
+.row:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; border-radius: 8px; }
+.row[aria-expanded="true"] { background: var(--accent-soft); }
+.row__main { display: block; min-width: 0; }
 @media (hover: hover) { .row:hover { background: var(--accent-softer); } }
 /* Datum kommender Prüfungen in einem hellgrünen Kästchen */
 .row__date { text-align: center; line-height: 1; padding: 7px 0 6px; border-radius: 10px; background: var(--accent-softer); }
 .row--past .row__date { background: transparent; }
 .row__day { display: block; font-size: 24px; font-weight: 600; color: var(--accent); font-variant-numeric: tabular-nums; }
 .row__wd { display: block; margin-top: 4px; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); }
-.row__title { margin: 0; font-size: 16px; font-weight: 700; line-height: 1.35; overflow-wrap: anywhere; }
+.row__title { display: block; margin: 0; font-size: 16px; font-weight: 700; line-height: 1.35; overflow-wrap: anywhere; }
 .row__meta { margin: 3px 0 0; display: flex; flex-wrap: wrap; color: var(--muted); font-size: 13px; font-weight: 500; }
 .row__meta > span + span::before { content: "·"; margin: 0 8px; }
 .row__subject { display: inline-flex; align-items: center; gap: 6px; }
 .row__subject::before { content: ""; width: 7px; height: 7px; border-radius: 50%; background: hsl(var(--h) 65% 50%); }
-.row__desc { margin: 6px 0 0; font-size: 13px; color: var(--muted); white-space: pre-line; overflow-wrap: anywhere; }
+.row__desc { display: block; margin: 6px 0 0; font-size: 13px; color: var(--muted); white-space: pre-line; overflow-wrap: anywhere; }
 .row--past .row__day, .row--past .row__title { color: var(--muted); }
 .row--past .row__title { font-weight: 600; }
 
@@ -621,7 +634,25 @@ button.tt-lesson[aria-expanded="true"] { box-shadow: 0 0 0 2px var(--accent); z-
 .pop__facts dt { color: var(--muted); font-weight: 500; }
 .pop__facts dd { margin: 0; font-weight: 600; }
 .pop__warn { color: var(--warn-text); }
+.pop__actions { display: flex; flex-direction: column; gap: 6px; }
+.pop__actions:empty { display: none; }
 .pop__open { width: 100%; height: 38px; font-size: 13px; }
+.pop__note {
+  margin: 0 0 8px; padding: 7px 10px; border-radius: 10px;
+  background: var(--warn-bg); color: var(--warn-text); font-size: 12px; font-weight: 600;
+}
+.pop__desc {
+  margin: -4px 0 14px; padding: 10px 12px; border-radius: 10px; background: var(--surface-2);
+  font-size: 13px; white-space: pre-line; overflow-wrap: anywhere; max-height: 160px; overflow-y: auto;
+}
+
+/* Kurzes Aufleuchten der Lektion nach "Im Stundenplan zeigen" */
+.tt-lesson--flash { animation: tt-flash 1.2s ease 2; z-index: 4; }
+@keyframes tt-flash {
+  0%, 100% { box-shadow: 0 0 0 0 transparent; }
+  50% { box-shadow: 0 0 0 4px var(--accent); }
+}
+@media (prefers-reduced-motion: reduce) { .tt-lesson--flash { animation: none; box-shadow: 0 0 0 3px var(--accent); } }
 
 @media (max-width: 960px) {
   .pop {
