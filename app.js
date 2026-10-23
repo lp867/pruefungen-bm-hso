@@ -857,11 +857,30 @@
   }
 
   function updateSetting(key, value) {
+    if (settings[key] === value) return;
     settings[key] = value;
     saveSettings();
-    applySettings();
+    if (key === "theme") withThemeTransition(applySettings);
+    else applySettings();
     if (key === "range") setRange(value);
     else render();
+  }
+
+  // Hell/Dunkel-Wechsel weich überblenden statt hart umschalten.
+  // Moderne Browser: View Transition (ganze Seite blendet über). Sonst: kurze Farbübergänge per CSS-Klasse.
+  function withThemeTransition(apply) {
+    if (reducedMotion.matches) return apply();
+    if (document.startViewTransition) {
+      const t = document.startViewTransition(apply);
+      // Bricht der Browser die Überblendung ab (z. B. Tab im Hintergrund), wird das Design trotzdem gesetzt
+      t.ready.catch(() => {});
+      t.finished.catch(() => {});
+      return;
+    }
+    const root = document.documentElement;
+    root.classList.add("theme-fade");
+    apply();
+    setTimeout(() => root.classList.remove("theme-fade"), 450);
   }
 
   function initSettings() {

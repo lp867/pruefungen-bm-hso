@@ -60,6 +60,17 @@
 
 * { box-sizing: border-box; }
 
+/* Weicher Hell/Dunkel-Wechsel (siehe withThemeTransition in app.js) */
+::view-transition-old(root),
+::view-transition-new(root) { animation-duration: .4s; animation-timing-function: ease; }
+/* Fallback für Browser ohne View Transitions: Farben gleiten kurz über */
+.theme-fade, .theme-fade *, .theme-fade *::before, .theme-fade *::after {
+  transition: background-color .4s ease, color .4s ease, border-color .4s ease, box-shadow .4s ease, fill .4s ease !important;
+}
+@media (prefers-reduced-motion: reduce) {
+  ::view-transition-old(root), ::view-transition-new(root) { animation: none; }
+}
+
 html { -webkit-text-size-adjust: 100%; }
 
 body {
