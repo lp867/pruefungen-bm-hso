@@ -31,7 +31,8 @@ Erklärungen zu allen Funktionen stehen im Menü unter „Hilfe & Infos“. Oben
 (ab 5 Schultagen ohne Lektion).
 
 Der Tab **Fächer** zeigt alle laufenden OpenOLAT-Kurse mit nächster Lektion, verbleibenden Lektionen bis Semesterende,
-nächster Prüfung und einem direkten Link zum Kurs.
+nächster Prüfung und einem direkten Link zum Kurs. Antippen einer Karte öffnet Details (Rhythmus, nächste Lektionen,
+alle Prüfungen im Fach). Auch Prüfungen sind antippbar und zeigen Lektion, Zimmer, Beschreibung und Links.
 
 - Quelle ist der OpenOLAT-Kalender. Sein iCal-Link enthält einen persönlichen Schlüssel und ist deshalb **nicht** im Code, sondern als Secret `OLAT_ICS_URL` im GitHub-Repository gespeichert (Settings → Secrets and variables → Actions).
 - Die GitHub Action `.github/workflows/stundenplan.yml` holt den Stundenplan alle 6 Stunden, wandelt ihn mit `tools/stundenplan.py` um und speichert `data/stundenplan.json`. Darin stehen nur Datum, Zeit, Fach und Zimmer, keine Namen von Lehrpersonen.

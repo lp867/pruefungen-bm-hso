@@ -80,8 +80,9 @@
     else if (typeHint) kind = typeHint.slice(0, 30);
 
     let subject = (subjectHint && find(subjectHint)) || find(title) || OTHER;
-    // Vorträge ohne Fach im Titel sind in dieser Klasse Geschichtsvorträge (mit "Fach: …" übersteuerbar)
-    if (subject === OTHER && kind === "Vortrag") subject = GESCHICHTE;
+    // Vorträge ("Vortrag: Thema") sind in dieser Klasse Geschichtsvorträge. Das Thema bestimmt nicht das Fach
+    // ("Weltwirtschaftskrise" ist kein VWL-Termin). Mit einer Zeile "Fach: …" übersteuerbar.
+    if (!subjectHint && kind === "Vortrag" && (subject === OTHER || /^\s*vortrag\b/i.test(title))) subject = GESCHICHTE;
     return { subject, kind };
   }
 
@@ -794,7 +795,7 @@
         const room = [l.room, l.note].filter(Boolean).join(" · ");
         // Antippen öffnet das Detailfeld (mit Link zum OpenOLAT-Kurs)
         const key = lessonKey(l);
-        const flash = tt.flash && ex.some((e) => examKey(e) === tt.flash) ? " tt-lesson--flash" : "";
+        const flash = tt.flash && (tt.flash === key || ex.some((e) => examKey(e) === tt.flash)) ? " tt-lesson--flash" : "";
         return `<button type="button" class="tt-lesson${cls}${flash}" data-pop="${esc(key)}" aria-haspopup="dialog" aria-expanded="${pop.key === key}" style="--h:${l.color};--top:${minutes(l.start) - from};--len:${len}">
             <span class="tt-lesson__time">${esc(timeRange(l.start, l.end))}</span>
             <span class="tt-lesson__subject">${esc(l.subject)}</span>
@@ -896,10 +897,11 @@
       box.innerHTML = `<div class="empty">Keine laufenden Kurse gefunden.</div>`;
       return;
     }
-    box.innerHTML = cards.map(({ course, next, remaining, last, exam }) => {
+    box.innerHTML = cards.map(({ id, course, next, remaining, last, exam }) => {
       const semester = (course.title.match(/Semester\s+(\d+)/) || [])[1];
       const running = next.start <= now;
-      return `<article class="subject-card" style="--h:${classify(course.title).subject.hue}">
+      const key = `course|${id}`;
+      return `<article class="subject-card" data-pop="${esc(key)}" role="button" tabindex="0" aria-haspopup="dialog" aria-expanded="${pop.key === key}" aria-label="Details zu ${esc(courseName(course.title))}" style="--h:${classify(course.title).subject.hue}">
           <header class="subject-card__head">
             <h3>${esc(courseName(course.title))}</h3>
             ${semester ? `<span class="subject-card__sem">Semester ${semester}</span>` : ""}
@@ -928,6 +930,9 @@
   // Öffnet das Detailfeld neben dem angetippten Element (am Handy: unten)
   function showPopover(anchor, key, hue, html) {
     const box = $("lesson-pop");
+    // Wird aus dem offenen Feld heraus ein weiteres geöffnet, bleibt es am bisherigen Element verankert
+    const nested = !box.hidden && box.contains(anchor) && pop.anchor;
+    if (nested) anchor = pop.anchor;
     box.style.setProperty("--h", hue);
     box.innerHTML = html;
     if (pop.anchor) pop.anchor.setAttribute("aria-expanded", "false");
@@ -973,6 +978,15 @@
       </div>`);
   }
 
+  // Fächer eines Kurses (z. B. Wirtschaft & Recht: VWL, Recht, BK) für die Zuordnung von Prüfungen
+  function courseSubjects(id) {
+    const course = tt.courses[id];
+    const set = new Set([course.title, ...tt.lessons.filter((l) => l.course === id).map((l) => l.subject)]
+      .map((x) => classify(x).subject));
+    set.delete(OTHER);
+    return set;
+  }
+
   // Kurs, dessen Lektionen zum Fach der Prüfung passen (für den OpenOLAT-Link)
   function courseForExam(e) {
     if (!tt.loaded || e.subject === OTHER) return null;
@@ -1016,16 +1030,83 @@
       </div>`);
   }
 
-  // Zur Woche der Prüfung im Stundenplan springen und die Lektion kurz hervorheben
-  function showExamInTimetable(key) {
-    const e = state.events.find((x) => examKey(x) === key);
-    if (!e) return;
+  const WEEKDAY_ORDER = [1, 2, 3, 4, 5, 6, 0];
+
+  function openCourse(card) {
+    const id = card.dataset.pop.slice("course|".length);
+    const course = tt.courses[id];
+    if (!course) return;
+    const now = new Date();
+    const lessons = tt.lessons.filter((l) => l.course === id);
+    const upcoming = lessons.filter((l) => l.end > now);
+    const subjects = courseSubjects(id);
+    const semester = (course.title.match(/Semester\s+(\d+)/) || [])[1];
+    const hue = classify(course.title).subject.hue;
+
+    // Wöchentlicher Rhythmus: Zeitfenster, die mindestens zweimal vorkommen
+    const slots = new Map();
+    for (const l of upcoming.length ? upcoming : lessons) {
+      const k = `${l.start.getDay()}|${timeRange(l.start, l.end)}`;
+      slots.set(k, (slots.get(k) || 0) + 1);
+    }
+    const rhythm = [...slots].filter(([, n]) => n >= 2).map(([k]) => k.split("|"))
+      .sort((a, b) => WEEKDAY_ORDER.indexOf(+a[0]) - WEEKDAY_ORDER.indexOf(+b[0]) || a[1].localeCompare(b[1]))
+      .map(([d, t]) => `${WEEKDAYS[d]} ${t}`);
+
+    // Übliches Zimmer
+    const rooms = new Map();
+    lessons.forEach((l) => l.room && rooms.set(l.room, (rooms.get(l.room) || 0) + 1));
+    const room = [...rooms].sort((a, b) => b[1] - a[1])[0];
+
+    const remaining = upcoming.reduce((n, l) => n + lessonCount(l), 0);
+    const nextLessons = upcoming.slice(0, 4).map((l) =>
+      `<li><span>${esc(shortDate(l.start))}, ${esc(timeRange(l.start, l.end))}</span><span class="pop__muted">${l.online ? "Online" : esc(l.room || "")}${l.usualRoom ? ` <span class="pop__warn">↻</span>` : ""}</span></li>`
+    ).join("");
+
+    // Kommende Prüfungen im Fach (antippbar: öffnet die Prüfungs-Details)
+    const exams = state.events.filter((e) => e.end > now && e.kind !== "Info" && subjects.has(e.subject));
+    const examList = exams.map((e) =>
+      `<li><button type="button" class="pop__link" data-pop="${esc(examKey(e))}" aria-haspopup="dialog">${esc(e.title)}</button><span class="pop__muted">${esc(e.period ? `ab ${shortDate(e.start)}` : shortDate(e.start))}</span></li>`
+    ).join("");
+
+    showPopover(card, card.dataset.pop, hue, `
+      ${popHead(courseName(course.title), [semester ? `Semester ${semester}` : "", [...subjects].map((x) => x.name).join(", ")].filter(Boolean).join(" · "))}
+      <dl class="pop__facts">
+        ${factRow("Rhythmus", rhythm.map(esc).join("<br>"))}
+        ${factRow("Zimmer", room ? esc(room[0]) : "")}
+        ${factRow("Noch", upcoming.length ? `${remaining} ${remaining === 1 ? "Lektion" : "Lektionen"} bis ${esc(shortDate(upcoming[upcoming.length - 1].start))}` : "")}
+      </dl>
+      ${nextLessons ? `<p class="pop__sub">Nächste Lektionen</p><ul class="pop__list">${nextLessons}</ul>` : ""}
+      <p class="pop__sub">Prüfungen</p>
+      ${examList ? `<ul class="pop__list">${examList}</ul>` : `<p class="pop__empty">Keine eingetragen</p>`}
+      <div class="pop__actions">
+        <a class="btn pop__open" href="${esc(course.url)}" target="_blank" rel="noopener">In OpenOLAT öffnen ↗</a>
+        ${upcoming.length ? `<button type="button" class="btn btn--ghost pop__open" data-show-week="${esc(lessonKey(upcoming[0]))}">Im Stundenplan zeigen</button>` : ""}
+        ${exams.length ? `<button type="button" class="btn btn--ghost pop__open" data-filter-subject="${esc(exams[0].subject.name)}">Prüfungen in der Liste</button>` : ""}
+      </div>`);
+  }
+
+  // Zur Prüfungsliste wechseln, gefiltert nach Fach
+  function showExamsOfSubject(name) {
     closePopover();
-    const saved = tt.offset;
+    state.subject = name;
+    state.query = "";
+    $("search").value = "";
+    setRange("upcoming");
+    location.hash = "pruefungen";
+    renderList(new Date());
+  }
+
+  // Zur Woche im Stundenplan springen und die Lektion (bzw. die Lektion mit der Prüfung) kurz hervorheben
+  function showExamInTimetable(key) {
+    const target = key.startsWith("lesson|")
+      ? tt.lessons.find((l) => lessonKey(l) === key)
+      : state.events.find((x) => examKey(x) === key);
+    if (!target) return;
+    closePopover();
     tt.offset = 0;
     const base = shownMonday(new Date());
-    tt.offset = saved;
-    tt.offset = Math.round((mondayOf(e.start) - base) / (7 * DAY));
+    tt.offset = Math.round((mondayOf(target.start) - base) / (7 * DAY));
     tt.flash = key;
     if (view === "stundenplan") renderTimetable(new Date());
     else location.hash = "stundenplan";
@@ -1081,25 +1162,42 @@
     }
   }
 
+  function openPopoverFor(el) {
+    const kind = el.dataset.pop.split("|")[0];
+    if (kind === "lesson") openLesson(el);
+    else if (kind === "course") openCourse(el);
+    else openExam(el);
+  }
+
   function initPopover() {
     // Lektionen, Prüfungszeilen und die nächste Prüfung oben öffnen das Detailfeld
     document.addEventListener("click", (ev) => {
       const target = ev.target.closest ? ev.target : null;
       const trigger = target && target.closest("[data-pop]");
       const box = $("lesson-pop");
+      // Links innerhalb einer antippbaren Karte (z. B. "In OpenOLAT öffnen") normal öffnen
+      if (trigger && target.closest("a[href]") && trigger.contains(target.closest("a[href]"))) return;
       if (trigger) {
         if (pop.key === trigger.dataset.pop && !box.hidden) closePopover();
-        else if (trigger.dataset.pop.startsWith("lesson|")) openLesson(trigger);
-        else openExam(trigger);
+        else openPopoverFor(trigger);
         return;
       }
       const show = target && target.closest("[data-show-week]");
       if (show) return showExamInTimetable(show.dataset.showWeek);
+      const filter = target && target.closest("[data-filter-subject]");
+      if (filter) return showExamsOfSubject(filter.dataset.filterSubject);
       if (target && target.closest(".pop__close")) return closePopover({ restoreFocus: true });
       if (!(target && target.closest("#lesson-pop"))) closePopover(); // Klick daneben schliesst
     });
     document.addEventListener("keydown", (ev) => {
       if (ev.key === "Escape" && !$("lesson-pop").hidden) closePopover({ restoreFocus: true });
+      // Karten sind keine echten Knöpfe: Enter und Leertaste selbst behandeln
+      const card = ev.target.closest && ev.target.closest('[data-pop][role="button"]');
+      if (card && ev.target === card && (ev.key === "Enter" || ev.key === " ")) {
+        ev.preventDefault();
+        if (pop.key === card.dataset.pop && !$("lesson-pop").hidden) closePopover();
+        else openPopoverFor(card);
+      }
     });
     // Beim Scrollen/Verkleinern am Computer schliessen, damit das Feld nicht losgelöst herumsteht
     window.addEventListener("resize", () => closePopover());

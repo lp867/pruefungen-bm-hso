@@ -573,6 +573,11 @@ button.tt-lesson[aria-expanded="true"] { box-shadow: 0 0 0 2px var(--accent); z-
   border: 1px solid var(--line); border-top: 3px solid hsl(var(--h) 50% 55%); border-radius: var(--radius);
   background: var(--surface);
 }
+/* Karte ist antippbar und öffnet das Detailfeld zum Kurs */
+.subject-card { cursor: pointer; transition: box-shadow .15s ease, transform .15s ease, border-color .15s ease; }
+@media (hover: hover) { .subject-card:hover { box-shadow: 0 4px 16px rgba(40, 60, 55, .10); transform: translateY(-1px); } }
+.subject-card:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.subject-card[aria-expanded="true"] { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent); }
 .subject-card__head { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; }
 .subject-card__head h3 { margin: 0; font-size: 16px; font-weight: 700; line-height: 1.3; hyphens: auto; overflow-wrap: break-word; }
 .subject-card__sem { flex: none; color: var(--muted); font-size: 11px; font-weight: 600; }
@@ -613,6 +618,7 @@ button.tt-lesson[aria-expanded="true"] { box-shadow: 0 0 0 2px var(--accent); z-
   border: 1px solid var(--line); border-top: 4px solid hsl(var(--h) 50% 55%);
   background: var(--surface); color: var(--text);
   box-shadow: 0 12px 40px rgba(20, 30, 28, .18);
+  max-height: calc(100vh - 24px); overflow-y: auto; overscroll-behavior: contain;
 }
 .pop[hidden] { display: none; }
 .pop:focus { outline: none; }
@@ -635,6 +641,17 @@ button.tt-lesson[aria-expanded="true"] { box-shadow: 0 0 0 2px var(--accent); z-
 .pop__facts dd { margin: 0; font-weight: 600; }
 .pop__warn { color: var(--warn-text); }
 .pop__actions { display: flex; flex-direction: column; gap: 6px; }
+.pop__sub { margin: 0 0 6px; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .08em; color: var(--accent-strong); }
+.pop__list { margin: 0 0 14px; padding: 0; list-style: none; font-size: 13px; }
+.pop__list li { display: flex; justify-content: space-between; gap: 10px; padding: 5px 0; border-bottom: 1px solid var(--line); }
+.pop__list li:last-child { border-bottom: 0; }
+.pop__muted { color: var(--muted); font-weight: 500; white-space: nowrap; }
+.pop__empty { margin: 0 0 14px; color: var(--muted); font-size: 13px; }
+.pop__link {
+  padding: 0; border: 0; background: none; font: inherit; font-weight: 600; color: var(--warn-text);
+  text-align: left; cursor: pointer; text-decoration: underline; text-decoration-color: transparent; text-underline-offset: 3px;
+}
+.pop__link:hover, .pop__link:focus-visible { text-decoration-color: currentColor; outline: none; }
 .pop__actions:empty { display: none; }
 .pop__open { width: 100%; height: 38px; font-size: 13px; }
 .pop__note {
@@ -660,6 +677,7 @@ button.tt-lesson[aria-expanded="true"] { box-shadow: 0 0 0 2px var(--accent); z-
     padding: 18px 20px calc(18px + env(safe-area-inset-bottom));
     border-radius: 18px 18px 0 0; border-left: 0; border-right: 0; border-bottom: 0;
     box-shadow: 0 -10px 40px rgba(20, 30, 28, .22);
+    max-height: 80vh;
   }
 }
 
