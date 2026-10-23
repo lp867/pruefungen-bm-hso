@@ -27,13 +27,22 @@ jobs:
         run: python3 tools/stundenplan.py data/stundenplan.json
 
       # Ersatzkopie der Prüfungen (wird gezeigt, wenn der Live-Abruf bei Google fehlschlägt).
-      # DTSTAMP ändert sich bei jedem Abruf; ohne diese Zeilen vergleichen, damit nur echte Änderungen gespeichert werden.
+      # Google liefert die Einträge in zufälliger Reihenfolge und setzt DTSTAMP bei jedem Abruf neu.
+      # Darum Einträge sortiert und ohne DTSTAMP vergleichen, damit nur echte Änderungen gespeichert werden.
       - name: Ersatzkopie der Prüfungen aktualisieren
         run: |
           url="https://calendar.google.com/calendar/ical/86f3a3eb765f4c49fc250489d0a1c9230bdb67dfe31d7a3ce306e5fa1a8b4028%40group.calendar.google.com/public/basic.ics"
           curl -fsS --max-time 60 "$url" -o /tmp/pruefungen.ics
           grep -q "BEGIN:VEVENT" /tmp/pruefungen.ics || { echo "Download leer, Ersatzkopie bleibt."; exit 0; }
-          if diff -q <(grep -v '^DTSTAMP' /tmp/pruefungen.ics) <(grep -v '^DTSTAMP' data/pruefungen.ics) >/dev/null; then
+          if python3 - /tmp/pruefungen.ics data/pruefungen.ics <<'PY'
+          import re, sys
+          def events(path):
+              text = re.sub(r"\r?\n[ \t]", "", open(path, encoding="utf-8").read())
+              blocks = re.findall(r"BEGIN:VEVENT.*?END:VEVENT", text, re.S)
+              return sorted("\n".join(l for l in b.splitlines() if not l.startswith("DTSTAMP")) for b in blocks)
+          sys.exit(0 if events(sys.argv[1]) == events(sys.argv[2]) else 1)
+          PY
+          then
             echo "Prüfungen unverändert."
           else
             cp /tmp/pruefungen.ics data/pruefungen.ics
