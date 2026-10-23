@@ -14,14 +14,15 @@
     { name: "Recht", hue: 30, re: /recht/i },
     { name: "VWL", hue: 45, re: /vwl|wirtschaft/i },
     { name: "FRW", hue: 190, re: /frw|finanz|rechnungswesen/i },
-    { name: "T&U", hue: 100, re: /t\s*&\s*u|\btu\b|technik|umwelt/i },
+    { name: "T&U", hue: 100, re: /\bt\s*[&+]\s*u\b|\btu\b|technik|umwelt/i },
     { name: "IKT", hue: 320, re: /ikt|informatik/i },
     { name: "Geschichte", hue: 15, re: /geschichte|politik|\bgp\b/i },
     { name: "IDAF", hue: 285, re: /idaf|idpa/i },
     { name: "BK", hue: 340, re: /\bbk\b|betriebskunde/i },
     { name: "Sport", hue: 125, re: /sport/i },
-    { name: "SPA", hue: 170, re: /\bspa\b/i },
+    { name: "SPA", hue: 170, re: /\bspa\b|knigge|abacus/i },
   ];
+  const GESCHICHTE = SUBJECTS.find((s) => s.name === "Geschichte");
   const OTHER = { name: "Sonstiges", hue: 220 };
 
   // Einstellungen (gespeichert im Browser des Besuchers)
@@ -31,12 +32,13 @@
   const state = {
     events: [],
     loaded: false,
-    loadedAt: null,
-    mode: "",
+    mode: "",        // "api" (live), "cache" (Browser-Zwischenspeicher) oder "ics" (Ersatzkopie)
+    dataAt: null,    // Stand der angezeigten Daten
+    checkedAt: null, // letzter Abrufversuch
+    error: null,     // Fehlermeldung des letzten Abrufs, sonst null
     range: settings.range,
     subject: null,
     query: "",
-    source: "",
   };
 
   // ---------- Hilfsfunktionen ----------
@@ -60,44 +62,81 @@
     return Math.round((startOfDay(to) - startOfDay(from)) / DAY);
   }
 
-  function classify(title) {
-    const subject = SUBJECTS.find((s) => s.re.test(title)) || OTHER;
+  // Fach und Terminart erkennen. Ausdrücklich hinterlegt geht vor: eine Zeile "Fach: …" bzw. "Typ: …"
+  // in der Kalenderbeschreibung übersteuert die Erkennung aus dem Titel.
+  function classify(title, description = "") {
+    const field = (name) => ((description.match(new RegExp(`^\\s*${name}\\s*:\\s*(.+)$`, "im")) || [])[1] || "").trim();
+    const subjectHint = field("Fach");
+    const typeHint = field("Typ") || field("Art");
+    const find = (text) => SUBJECTS.find((s) => s.re.test(text));
+
     let kind = null;
-    if (/abgabe|frist|dossier/i.test(title)) kind = "Abgabe / Frist";
-    else if (/nachpr|nachhol/i.test(title)) kind = "Nachprüfung";
-    else if (/zeugnis|rückgabe/i.test(title)) kind = "Info";
-    else if (/kurzpr/i.test(title)) kind = "Kurzprüfung";
+    const t = typeHint || title;
+    if (/abgabe|frist|dossier|bericht/i.test(t)) kind = "Abgabe / Frist";
+    else if (/nachpr|nachhol/i.test(t)) kind = "Nachprüfung";
+    else if (/zeugnis|rückgabe/i.test(t)) kind = "Info";
+    else if (/kurzpr|kurztest|minitest/i.test(t)) kind = "Kurztest";
+    else if (/vortrag|präsentation/i.test(t)) kind = "Vortrag";
+    else if (typeHint) kind = typeHint.slice(0, 30);
+
+    let subject = (subjectHint && find(subjectHint)) || find(title) || OTHER;
+    // Vorträge ohne Fach im Titel sind in dieser Klasse Geschichtsvorträge (mit "Fach: …" übersteuerbar)
+    if (subject === OTHER && kind === "Vortrag") subject = GESCHICHTE;
     return { subject, kind };
   }
 
   function makeEvent({ id, title, start, end, allDay, location, description }) {
     title = (title || "Ohne Titel").trim();
+    description = description || "";
     if (!end || end <= start) end = new Date(start.getTime() + (allDay ? DAY : 60 * 60 * 1000));
-    return { id, title, start, end, allDay, location: location || "", description: description || "", ...classify(title) };
+    return {
+      id, title, start, end, allDay, location: location || "", description,
+      ...classify(title, description),
+      // Mehrtägiger Zeitraum (z. B. Abgabewoche): wird getrennt von der "nächsten Prüfung" behandelt
+      period: allDay && end - start > DAY + 3600000,
+      // Termin steht nur ungefähr fest, z. B. "(KW 51, genaue Tage offen)"
+      vague: /genaue[rn]?\s+tag(e)?\s+offen|datum\s+(noch\s+)?offen|termin\s+(noch\s+)?offen/i.test(description),
+    };
   }
 
   // ---------- Daten laden ----------
 
+  // fetch mit Zeitlimit, damit ein hängender Abruf nicht ewig "lädt"
+  async function fetchWithTimeout(url, options = {}, ms = 12000) {
+    const ctrl = new AbortController();
+    const timer = setTimeout(() => ctrl.abort(), ms);
+    try {
+      return await fetch(url, { ...options, signal: ctrl.signal });
+    } catch (err) {
+      throw new Error(err.name === "AbortError" ? "Zeitüberschreitung beim Abruf" : navigator.onLine === false ? "Keine Internetverbindung" : "Verbindung fehlgeschlagen");
+    } finally {
+      clearTimeout(timer);
+    }
+  }
+
   async function loadFromApi() {
     const timeMin = new Date(Date.now() - CONFIG.pastDays * DAY).toISOString();
-    const params = new URLSearchParams({
-      key: CONFIG.apiKey,
-      singleEvents: "true",
-      orderBy: "startTime",
-      timeMin,
-      maxResults: "250",
-    });
-    const url = `https://www.googleapis.com/calendar/v3/calendars/${encodeURIComponent(CONFIG.calendarId)}/events?${params}`;
-    const res = await fetch(url);
-    if (!res.ok) throw new Error(`Google Calendar API antwortet mit ${res.status}`);
-    const data = await res.json();
+    const base = `https://www.googleapis.com/calendar/v3/calendars/${encodeURIComponent(CONFIG.calendarId)}/events`;
+    const items = [];
+    let pageToken = "";
+    // Google liefert Ergebnisse seitenweise: alle Seiten abholen (mit Obergrenze als Schutz)
+    for (let page = 0; page < 10; page++) {
+      const params = new URLSearchParams({ key: CONFIG.apiKey, singleEvents: "true", orderBy: "startTime", timeMin, maxResults: "250" });
+      if (pageToken) params.set("pageToken", pageToken);
+      const res = await fetchWithTimeout(`${base}?${params}`);
+      if (!res.ok) throw new Error(`Google Kalender antwortet mit Fehler ${res.status}`);
+      const data = await res.json();
+      items.push(...(data.items || []));
+      pageToken = data.nextPageToken;
+      if (!pageToken) break;
+    }
 
     const parseDate = (d) => {
       const [y, m, day] = d.split("-").map(Number);
       return new Date(y, m - 1, day);
     };
 
-    return (data.items || [])
+    return items
       .filter((e) => e.status !== "cancelled")
       .map((e) => {
         const allDay = Boolean(e.start.date);
@@ -113,16 +152,37 @@
       });
   }
 
+  // HTML aus Kalenderbeschreibungen sicher in Text umwandeln. DOMParser erzeugt ein inaktives Dokument:
+  // darin laufen keine Skripte und keine Event-Handler, es werden auch keine Bilder geladen.
   function stripHtml(s) {
-    const div = document.createElement("div");
-    div.innerHTML = s.replace(/<br\s*\/?>/gi, "\n");
-    return div.textContent || "";
+    if (!/[<&]/.test(s)) return s;
+    const html = s.replace(/<br\s*\/?>/gi, "\n").replace(/<\/(p|div|li)>/gi, "\n");
+    return (new DOMParser().parseFromString(html, "text/html").body.textContent || "").trim();
   }
 
   async function loadFromIcs() {
-    const res = await fetch(CONFIG.icsFallback, { cache: "no-store" });
-    if (!res.ok) throw new Error(`Lokale Kalenderkopie nicht gefunden (${res.status})`);
+    const res = await fetchWithTimeout(CONFIG.icsFallback, { cache: "no-store" });
+    if (!res.ok) throw new Error(`Ersatzkopie nicht gefunden (${res.status})`);
     return parseIcs(await res.text());
+  }
+
+  // Letzten erfolgreichen Live-Stand im Browser merken, als Ersatz bei einem späteren Ausfall
+  const CACHE_KEY = "pruefungen:cache";
+  function saveCache(events) {
+    try {
+      const raw = events.map(({ id, title, start, end, allDay, location, description }) =>
+        ({ id, title, start: start.toISOString(), end: end.toISOString(), allDay, location, description }));
+      localStorage.setItem(CACHE_KEY, JSON.stringify({ savedAt: new Date().toISOString(), events: raw }));
+    } catch { /* Speicher voll oder gesperrt: dann eben ohne Zwischenspeicher */ }
+  }
+  function loadCache() {
+    try {
+      const data = JSON.parse(localStorage.getItem(CACHE_KEY));
+      if (!data || !Array.isArray(data.events)) return null;
+      const events = data.events.map((e) => makeEvent({ ...e, start: new Date(e.start), end: new Date(e.end) }));
+      events.stamp = new Date(data.savedAt);
+      return events;
+    } catch { return null; }
   }
 
   function parseIcsDate(value, params) {
@@ -217,11 +277,17 @@
   const $ = (id) => document.getElementById(id);
 
   function renderHero(now) {
-    const next = state.events.find((e) => e.end > now);
+    // Mehrtägige Zeiträume (z. B. Abgabewoche) verdrängen nicht die nächste echte Prüfung,
+    // sie stehen als eigene Zeile "Läuft gerade" darunter.
+    const next = state.events.find((e) => e.end > now && !e.period && e.kind !== "Info");
+    const periods = state.events.filter((e) => e.period && e.start <= now && now < e.end);
+    const periodHtml = periods.map((p) =>
+      `<p class="hero__period">Läuft gerade: <strong>${esc(p.title)}</strong> · bis ${esc(shortDate(new Date(p.end - DAY)))}${p.vague ? " (genaue Tage offen)" : ""}</p>`
+    ).join("");
     const hero = $("hero");
     if (!next) {
       hero.innerHTML = `<p class="hero__label">Nächste Prüfung</p><h2 class="hero__title">Keine Prüfungen geplant 🎉</h2>
-        <p class="hero__meta">Sobald ein neuer Termin im Kalender steht, erscheint er hier.</p>`;
+        <p class="hero__meta">Sobald ein neuer Termin im Kalender steht, erscheint er hier.</p>${periodHtml}`;
       return;
     }
     const running = next.start <= now;
@@ -243,6 +309,7 @@
             ${next.location ? `<span>${esc(next.location)}</span>` : ""}
           </p>
           ${next.sameDay ? `<p class="hero__conflict">Achtung: ${conflictLabel(next)}</p>` : ""}
+          ${periodHtml}
         </div>
         ${running ? "" : `<div class="countdown" aria-label="Countdown">${cell(d, d === 1 ? "Tag" : "Tage")}${cell(h, "Std")}${cell(m, "Min")}${settings.seconds ? cell(s, "Sek") : ""}</div>`}
       </div>`;
@@ -262,7 +329,8 @@
     for (const e of events) {
       e.sameDay = 0;
       e.sameDayTitles = [];
-      if (e.kind === "Info") continue; // z. B. Zeugnisrückgabe ist keine Prüfung
+      // Zeugnisrückgabe ist keine Prüfung; mehrtägige Zeiträume überschneiden sich zwangsläufig mit anderem
+      if (e.kind === "Info" || e.period) continue;
       const key = startOfDay(e.start).getTime();
       if (!byDay.has(key)) byDay.set(key, []);
       byDay.get(key).push(e);
@@ -335,6 +403,8 @@
     const meta = [timeLabel(e), e.location].filter(Boolean).map((m) => `<span>${esc(m)}</span>`).join("");
     const tags = [
       e.kind ? `<span class="tag${/Nach|Frist/.test(e.kind) ? " tag--warn" : ""}">${esc(e.kind)}</span>` : "",
+      e.period ? `<span class="tag">Zeitraum</span>` : "",
+      e.vague ? `<span class="tag tag--warn" title="Der genaue Tag steht noch nicht fest">Datum offen</span>` : "",
       e.sameDay ? `<span class="tag tag--warn" title="${esc(e.sameDayTitles.join(", "))}">${esc(conflictLabel(e))}</span>` : "",
     ].join("");
     return `
@@ -358,11 +428,19 @@
     renderList(now);
     renderFacts(now);
     if (view !== "pruefungen") renderTimetableViews(now); // Prüfungen erscheinen auch im Stundenplan und bei den Fächern
+    renderStatus();
     renderFooter();
   }
 
   function renderFooter() {
-    $("source").textContent = view !== "pruefungen" ? tt.source : state.source;
+    const t = (d) => (d ? fmt.stamp.format(d) : "–");
+    const exams = {
+      api: state.error ? `Prüfungen: Live-Stand vom ${t(state.dataAt)} · letzte Aktualisierung fehlgeschlagen` : `Prüfungen: live aus Google Kalender · Stand ${t(state.dataAt)}`,
+      cache: `Prüfungen: zwischengespeicherter Stand vom ${t(state.dataAt)}`,
+      ics: `Prüfungen: Ersatzkopie vom ${t(state.dataAt)}`,
+    }[state.mode] || "";
+    const timetable = tt.loaded ? `Stundenplan aus OpenOLAT · Stand ${t(tt.dataAt)}${tt.error ? " · Aktualisierung fehlgeschlagen" : ""}` : "";
+    $("source").textContent = (view === "pruefungen" ? [exams] : [timetable, exams]).filter(Boolean).join("  ·  ");
   }
 
   function renderFacts(now) {
@@ -374,9 +452,10 @@
       row("Einträge", `${state.events.length} total, ${upcoming} kommend`) +
       row("Fächer", String(subjects)) +
       row("Konflikte", conflictDays ? `${conflictDays} Tag(e) mit mehreren Prüfungen` : "keine kommenden") +
-      row("Datenquelle", state.mode === "api" ? "Google Kalender (live)" : "Lokale Kalenderkopie") +
-      row("Stand", state.loadedAt ? fmt.stamp.format(state.loadedAt) : "–") +
-      (state.mode === "api" ? row("Aktualisierung", "automatisch alle 10 Min.") : "");
+      row("Datenquelle", { api: "Google Kalender (live)", cache: "Zwischenspeicher im Browser", ics: "Ersatzkopie" }[state.mode] || "–") +
+      row("Stand", state.dataAt ? fmt.stamp.format(state.dataAt) : "–") +
+      row("Verbindung", state.error ? `Fehler: ${state.error}` : "OK") +
+      (CONFIG.apiKey ? row("Aktualisierung", "automatisch alle 10 Min.") : "");
   }
 
   // ---------- Bedienung ----------
@@ -482,7 +561,7 @@
 
   // ---------- Stundenplan ----------
 
-  const tt = { lessons: [], courses: {}, breaks: [], loaded: false, offset: 0, source: "" };
+  const tt = { lessons: [], courses: {}, breaks: [], loaded: false, offset: 0, dataAt: null, error: null };
   const WEEKDAYS = ["So", "Mo", "Di", "Mi", "Do", "Fr", "Sa"];
 
   // "2026-10-21T08:30" als lokale Zeit lesen
@@ -493,13 +572,23 @@
     return new Date(y, m - 1, day, h, mi);
   }
 
-  async function loadTimetable() {
-    $("tt-week").innerHTML = `<div class="empty">Stundenplan wird geladen…</div>`;
+  // Nur Links zu Kursen auf openolat.hso.ch zulassen; der Link wird aus der Kurs-ID neu gebaut
+  function courseUrl(id) {
+    return /^\d{1,15}$/.test(id || "") ? `https://openolat.hso.ch/auth/RepositoryEntry/${id}` : "";
+  }
+
+  // Stundenplan laden. Mit { silent: true } (Neuladen) bleibt der bisherige Stand bei einem Fehler stehen.
+  async function loadTimetable({ silent = false } = {}) {
+    if (!tt.loaded && !silent) $("tt-week").innerHTML = `<div class="empty">Stundenplan wird geladen…</div>`;
     try {
-      const res = await fetch(CONFIG.timetableUrl || "data/stundenplan.json", { cache: "no-store" });
+      const res = await fetchWithTimeout(CONFIG.timetableUrl || "data/stundenplan.json", { cache: "no-store" });
       if (!res.ok) throw new Error(`Stundenplan nicht gefunden (${res.status})`);
       const data = await res.json();
-      tt.courses = data.courses || {};
+      tt.courses = {};
+      for (const [id, c] of Object.entries(data.courses || {})) {
+        const url = courseUrl(id);
+        if (url) tt.courses[id] = { title: String(c.title || "").slice(0, 80), url };
+      }
       tt.lessons = data.lessons.map((l) => ({
         start: localDate(l.start),
         end: localDate(l.end),
@@ -507,21 +596,24 @@
         room: l.room,
         note: l.note || "",
         course: l.course || "",
-        url: (tt.courses[l.course] || {}).url || "",
+        url: tt.courses[l.course] ? tt.courses[l.course].url : "",
         color: classify(l.subject).subject.hue,
       }));
       markDeviations(tt.lessons);
       tt.breaks = findBreaks(tt.lessons);
-      tt.loaded = true;
-      tt.source = `Stundenplan aus OpenOLAT · zuletzt geändert ${fmt.stamp.format(new Date(data.updated))}`;
+      Object.assign(tt, { loaded: true, dataAt: new Date(data.updated), error: null });
       renderTimetableViews(new Date());
-      renderFooter();
     } catch (err) {
       console.error(err);
-      const msg = `<div class="error">${esc(err.message)}</div>`;
-      $("tt-week").innerHTML = msg;
-      $("subject-cards").innerHTML = msg;
+      tt.error = err.message;
+      if (!tt.loaded) {
+        const msg = `<div class="error">${esc(err.message)}</div>`;
+        $("tt-week").innerHTML = msg;
+        $("subject-cards").innerHTML = msg;
+      }
     }
+    renderStatus();
+    renderFooter();
   }
 
   const shortDate = (d) => `${WEEKDAYS[d.getDay()]} ${d.getDate()}.${d.getMonth() + 1}.`;
@@ -583,8 +675,15 @@
 
   function shownMonday(now) {
     const base = mondayOf(now);
-    // Am Wochenende gleich die kommende Woche zeigen
-    if (now.getDay() === 6 || now.getDay() === 0) base.setDate(base.getDate() + 7);
+    // Am Wochenende erst dann die kommende Woche zeigen, wenn am Wochenende nichts mehr ansteht
+    // (z. B. Sport am Samstag oder ein Nachprüfungstermin)
+    if (now.getDay() === 6 || now.getDay() === 0) {
+      const weekEnd = new Date(base);
+      weekEnd.setDate(base.getDate() + 7);
+      const pending = tt.lessons.some((l) => l.end > now && l.start < weekEnd) ||
+        state.events.some((e) => !e.period && e.kind !== "Info" && e.end > now && e.start < weekEnd);
+      if (!pending) base.setDate(base.getDate() + 7);
+    }
     base.setDate(base.getDate() + tt.offset * 7);
     return base;
   }
@@ -622,7 +721,7 @@
       date.setDate(monday.getDate() + i);
       const key = date.getTime();
       const lessons = tt.lessons.filter((l) => startOfDay(l.start).getTime() === key);
-      const exams = state.events.filter((e) => e.kind !== "Info" && startOfDay(e.start).getTime() === key);
+      const exams = state.events.filter((e) => e.kind !== "Info" && !e.period && startOfDay(e.start).getTime() === key);
       // Samstag/Sonntag nur zeigen, wenn dort etwas stattfindet
       if (i >= 5 && !lessons.length && !exams.length) continue;
       days.push({ date, lessons, exams });
@@ -632,7 +731,7 @@
     friday.setDate(monday.getDate() + 4);
     $("tt-label").innerHTML = `<strong>KW ${isoWeek(monday)}</strong><span>${esc(fmt.dayMonth.format(monday))} – ${esc(fmt.dayMonth.format(friday))} ${friday.getFullYear()}</span>`;
     $("tt-today").hidden = tt.offset === 0;
-    renderNotes(days);
+    renderNotes(days, monday);
 
     const empty = days.every((d) => !d.lessons.length && !d.exams.length);
     const week = $("tt-week");
@@ -726,7 +825,7 @@
     if (current) {
       html = `<span class="tt-holiday__label">Ferien</span><strong>Schöne Ferien! 🌿</strong><span>noch bis ${esc(shortDate(current.to))}</span>`;
     } else if (next) {
-      html = `<span class="tt-holiday__label">Nächste Ferien</span><strong>${esc(inDays(dayDiff(now, next.from)))}</strong><span>${esc(shortDate(next.from))} – ${esc(shortDate(next.to))}</span>`;
+      html = `<span class="tt-holiday__label" title="Aus Lücken im Stundenplan erkannt, keine offizielle Ferienliste">Nächste Ferien · laut Stundenplan</span><strong>${esc(inDays(dayDiff(now, next.from)))}</strong><span>${esc(shortDate(next.from))} – ${esc(shortDate(next.to))}</span>`;
     }
     if (freeDay) {
       const range = freeDay.days > 1 ? `${shortDate(freeDay.from)} – ${shortDate(freeDay.to)}` : shortDate(freeDay.from);
@@ -737,8 +836,16 @@
   }
 
   // Hinweise zur angezeigten Woche: Zimmerwechsel, online, Samstag, Infotermine, freie Tage
-  function renderNotes(days) {
+  function renderNotes(days, monday) {
     const notes = [];
+    // Mehrtägige Zeiträume (Abgabewochen, Prüfungsblöcke), die diese Woche betreffen
+    const weekEnd = new Date(monday);
+    weekEnd.setDate(monday.getDate() + 7);
+    for (const e of state.events) {
+      if (!e.period || e.end <= monday || e.start >= weekEnd) continue;
+      const last = new Date(e.end - DAY);
+      notes.push({ type: "period", text: `${shortDate(e.start)} – ${shortDate(last)}: ${e.title}${e.vague ? " (genaue Tage offen)" : ""}` });
+    }
     for (const { date, lessons } of days) {
       const day = shortDate(date);
       for (const l of lessons) {
@@ -766,6 +873,11 @@
       .replace("Rechungswesen", "Rechnungswesen");
   }
 
+  // Ein Unterrichtsblock umfasst oft mehrere Lektionen (45 Min. + Pausen), z. B. 13:00–17:25 = 5 Lektionen
+  function lessonCount(l) {
+    return Math.max(1, Math.round((l.end - l.start) / 60000 / 50));
+  }
+
   function renderSubjects(now) {
     if (!tt.loaded) return;
     const cards = Object.entries(tt.courses).map(([id, course]) => {
@@ -776,7 +888,7 @@
       const subjects = new Set([course.title, ...lessons.map((l) => l.subject)].map((s) => classify(s).subject.name));
       subjects.delete(OTHER.name);
       const exam = state.events.find((e) => e.end > now && e.kind !== "Info" && subjects.has(e.subject.name));
-      return { id, course, next: upcoming[0], remaining: upcoming.length, last: upcoming[upcoming.length - 1], exam };
+      return { id, course, next: upcoming[0], remaining: upcoming.reduce((n, l) => n + lessonCount(l), 0), last: upcoming[upcoming.length - 1], exam };
     }).filter(Boolean).sort((a, b) => a.next.start - b.next.start);
 
     const box = $("subject-cards");
@@ -799,7 +911,7 @@
             <dt>Noch</dt>
             <dd>${remaining} ${remaining === 1 ? "Lektion" : "Lektionen"} <span class="subject-card__muted">bis ${esc(shortDate(last.start))}</span></dd>
             <dt>Prüfung</dt>
-            <dd>${exam ? `<span class="subject-card__exam">${esc(exam.title)} · ${esc(shortDate(exam.start))}</span>` : `<span class="subject-card__muted">keine geplant</span>`}</dd>
+            <dd>${exam ? `<span class="subject-card__exam">${esc(exam.title)} · ${esc(exam.period ? `ab ${shortDate(exam.start)}` : shortDate(exam.start))}${exam.vague ? " (Datum offen)" : ""}</span>` : `<span class="subject-card__muted">keine eingetragen</span>`}</dd>
           </dl>
           <a class="btn subject-card__open" href="${esc(course.url)}" target="_blank" rel="noopener">In OpenOLAT öffnen ↗</a>
         </article>`;
@@ -888,7 +1000,7 @@
     const menu = $("menu");
     const header = document.querySelector(".top");
     // Alles ausser Kopfzeile und Panel ist gesperrt, solange das Menü offen ist
-    const background = [...document.querySelectorAll("[data-panel], .views, .foot")];
+    const background = [...document.querySelectorAll("[data-panel], .views, .foot, #status")];
 
     const isOpen = () => menu.getAttribute("aria-expanded") === "true";
 
@@ -900,7 +1012,9 @@
       document.body.classList.toggle("menu-open", open);
       drawer.inert = !open;
       background.forEach((el) => { el.inert = open; });
-      if (!open) menu.focus();
+      // Tastaturfokus ins Menü legen bzw. beim Schliessen zurück auf die zwei Balken
+      if (open) drawer.querySelector("button, a[href], input, select").focus({ preventScroll: true });
+      else menu.focus();
     }
 
     menu.addEventListener("click", () => setOpen(!isOpen()));
@@ -922,7 +1036,7 @@
       const btn = ev.currentTarget;
       btn.disabled = true;
       btn.textContent = "Lädt…";
-      await refresh();
+      await reloadAll(); // Prüfungen und Stundenplan
       btn.disabled = false;
       btn.textContent = "Daten neu laden";
     });
@@ -966,38 +1080,83 @@
     });
   }
 
+  // Prüfungen laden. Reihenfolge: live von Google; falls das scheitert, der neuere Stand aus
+  // Browser-Zwischenspeicher bzw. Ersatzkopie. Fehler werden sichtbar gemacht (siehe renderStatus).
   async function refresh() {
-    try {
-      let events = null;
-      if (CONFIG.apiKey) {
-        try {
-          events = await loadFromApi();
-          state.mode = "api";
-          state.loadedAt = new Date();
-          state.source = `Live aus Google Kalender · Stand ${fmt.stamp.format(state.loadedAt)}`;
-        } catch (err) {
-          // Google nicht erreichbar oder Schlüssel abgelehnt: auf lokale Kopie ausweichen
-          console.warn("Live-Abruf fehlgeschlagen, verwende lokale Kopie:", err);
-          if (state.mode === "api") return; // bereits Live-Daten angezeigt, diese behalten
+    const checkedAt = new Date();
+    let liveError = null;
+    if (CONFIG.apiKey) {
+      try {
+        const events = await loadFromApi();
+        saveCache(events);
+        applyEvents(events, { mode: "api", dataAt: checkedAt, checkedAt, error: null });
+        return;
+      } catch (err) {
+        console.warn("Live-Abruf fehlgeschlagen:", err);
+        liveError = err.message;
+        // Bereits Live-Daten angezeigt: diese behalten, aber deutlich melden, dass Änderungen gerade nicht ankommen
+        if (state.loaded && state.mode === "api") {
+          Object.assign(state, { checkedAt, error: liveError });
+          renderStatus();
+          renderFooter();
+          return;
         }
       }
-      if (!events) {
-        events = await loadFromIcs();
-        state.mode = "ics";
-        state.loadedAt = events.stamp || new Date();
-        state.source = `Lokale Kalenderkopie vom ${fmt.stamp.format(state.loadedAt)}`;
-      }
-      state.events = events.sort((a, b) => a.start - b.start);
-      markConflicts(state.events);
-      state.loaded = true;
-      render();
+    }
+    try {
+      const ics = await loadFromIcs().catch(() => null);
+      const cache = CONFIG.apiKey ? loadCache() : null;
+      const useCache = cache && (!ics || !ics.stamp || cache.stamp > ics.stamp);
+      const events = useCache ? cache : ics;
+      if (!events) throw new Error(liveError || "Keine Daten verfügbar");
+      applyEvents(events, { mode: useCache ? "cache" : "ics", dataAt: events.stamp || null, checkedAt, error: liveError });
     } catch (err) {
       console.error(err);
       if (!state.loaded) {
-        $("hero").innerHTML = `<p class="hero__label">Fehler</p><h2 class="hero__title">Kalender konnte nicht geladen werden</h2>`;
+        $("hero").innerHTML = `<p class="hero__label">Fehler</p><h2 class="hero__title">Prüfungen konnten nicht geladen werden</h2>`;
         $("list").innerHTML = `<div class="error">${esc(err.message)}</div>`;
       }
+      Object.assign(state, { checkedAt, error: err.message });
+      renderStatus();
     }
+  }
+
+  function applyEvents(events, status) {
+    state.events = events.sort((a, b) => a.start - b.start);
+    markConflicts(state.events);
+    Object.assign(state, status);
+    state.loaded = true;
+    render();
+  }
+
+  // Beide Datenquellen neu laden (Knopf "Daten neu laden", "Erneut versuchen", wieder online)
+  function reloadAll() {
+    return Promise.all([refresh(), loadTimetable({ silent: true })]);
+  }
+
+  // Sichtbare Warnung oben, solange etwas nicht aktuell ist
+  function renderStatus() {
+    const msgs = [];
+    const stamp = (d) => (d ? fmt.stamp.format(d) : "unbekannt");
+    if (state.error) {
+      if (state.mode === "api") {
+        msgs.push(`Aktualisierung der Prüfungen fehlgeschlagen (${state.error}). Angezeigt wird der Stand vom ${stamp(state.dataAt)}, neue Änderungen kommen gerade nicht an.`);
+      } else if (state.loaded) {
+        msgs.push(`Live-Abruf fehlgeschlagen (${state.error}). Angezeigt wird ${state.mode === "cache" ? "der zuletzt gespeicherte Stand" : "die Ersatzkopie"} vom ${stamp(state.dataAt)}, neuere Änderungen fehlen eventuell.`);
+      } else {
+        msgs.push(`Prüfungen konnten nicht geladen werden (${state.error}).`);
+      }
+    }
+    if (tt.error) {
+      msgs.push(tt.loaded
+        ? `Stundenplan konnte nicht aktualisiert werden (${tt.error}). Angezeigt wird der Stand vom ${stamp(tt.dataAt)}.`
+        : `Stundenplan konnte nicht geladen werden (${tt.error}).`);
+    }
+    const box = $("status");
+    box.hidden = !msgs.length;
+    box.innerHTML = msgs.length
+      ? `<div class="status__text">${msgs.map((m) => `<p>${esc(m)}</p>`).join("")}</div><button type="button" class="btn status__retry">Erneut versuchen</button>`
+      : "";
   }
 
   initSettings();
@@ -1011,5 +1170,15 @@
     render();
     if (!state.loaded && view !== "pruefungen") renderTimetableViews(new Date());
   }, 60 * 1000);
-  if (CONFIG.apiKey) setInterval(refresh, 10 * 60 * 1000); // neue Einträge alle 10 Min.
+  if (CONFIG.apiKey) setInterval(refresh, 10 * 60 * 1000); // neue Prüfungen alle 10 Min.
+  setInterval(() => { if (tt.loaded) loadTimetable({ silent: true }); }, 30 * 60 * 1000); // Stundenplan alle 30 Min.
+  // "Erneut versuchen" in der Warnung und automatisch, sobald das Gerät wieder online ist
+  $("status").addEventListener("click", (ev) => {
+    const btn = ev.target.closest(".status__retry");
+    if (!btn) return;
+    btn.disabled = true;
+    btn.textContent = "Lädt…";
+    reloadAll();
+  });
+  window.addEventListener("online", () => reloadAll());
 })();

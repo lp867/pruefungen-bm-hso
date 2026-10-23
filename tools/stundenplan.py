@@ -51,28 +51,36 @@ def parse_time(value, params):
     return dt.strftime("%Y-%m-%dT%H:%M")
 
 
+def subject_from_summary(summary):
+    # "EFZ BM Deutsch Semester 2 - Name (…)" -> "Deutsch" (der Teil mit der Lehrperson wird nie übernommen)
+    m = re.search(r"EFZ (?:BM )?(.+?) Semester", summary)
+    return m.group(1) if m else "Unterricht"
+
+
 def subject_of(description, summary):
+    """Fachbezeichnung für die Website. Nur kurze, erwartete Texte werden übernommen,
+    damit nie versehentlich Namen oder längere Notizen veröffentlicht werden."""
     if re.search(r"kein unterricht", description, re.I):
         return "Informationstermin", "kein Unterricht"
-    if description:
-        return description, ""
-    # Fallback: "EFZ BM Deutsch Semester 2 - Name (…)" -> "Deutsch"
-    m = re.search(r"EFZ BM (.+?) Semester", summary)
-    return (m.group(1) if m else "Unterricht"), ""
+    text = re.split(r"\s+-\s+|\(", description)[0].strip()  # alles nach " - " oder "(" abschneiden
+    if text and len(text) <= 40 and re.fullmatch(r"[\wÀ-ÿ&+.,/ -]+", text):
+        return text, ""
+    return subject_from_summary(summary), ""
 
 
 def course_of(cur):
     """Kurs-ID, Kursname und Link zum OpenOLAT-Kurs (ohne Lehrperson)."""
     url = cur.get("url", "")
-    m = re.search(r"/RepositoryEntry/(\d+)", url)
-    if not m:
+    m = re.match(r"^https://openolat\.hso\.ch/auth/RepositoryEntry/(\d+)/?$", url)
+    if not m:  # nur echte Kurslinks der HSO übernehmen
         return None, None
     # X-OLAT-LINK: RepositoryEntry§<url>§<Kursname>§<url>§<icon>
     parts = cur.get("olat_link", "").split("§")
     title = parts[2] if len(parts) > 2 else ""
     if not title:  # Fallback: "EFZ BM Deutsch Semester 2 - Name (…)" -> Teil vor " - "
         title = cur.get("summary", "").split(" - ")[0]
-    return m.group(1), {"title": title.strip(), "url": url}
+    # Link aus der geprüften Kurs-ID neu zusammensetzen statt die Quelle 1:1 zu übernehmen
+    return m.group(1), {"title": title.strip()[:80], "url": f"https://openolat.hso.ch/auth/RepositoryEntry/{m.group(1)}"}
 
 
 def convert(ics_text):
@@ -84,7 +92,7 @@ def convert(ics_text):
             cur = {}
             continue
         if line == "END:VEVENT":
-            if cur and cur.get("start"):
+            if cur and cur.get("start") and not cur.get("cancelled"):
                 subject, note = subject_of(cur.get("description", ""), cur.get("summary", ""))
                 lesson = {
                     "start": cur["start"],
@@ -119,8 +127,8 @@ def convert(ics_text):
             cur["url"] = value.strip()
         elif name == "X-OLAT-LINK":
             cur["olat_link"] = unescape(value)
-        elif name == "STATUS" and value == "CANCELLED":
-            cur["start"] = None
+        elif name == "STATUS" and value.strip() == "CANCELLED":
+            cur["cancelled"] = True  # erst am Ende auswerten, egal wo STATUS steht
 
     cutoff = (datetime.now() - timedelta(days=KEEP_PAST_DAYS)).strftime("%Y-%m-%dT00:00")
     lessons = [l for l in lessons if l["start"] >= cutoff]

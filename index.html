@@ -4,14 +4,12 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Prüfungen BM</title>
-  <meta name="description" content="Alle Prüfungsdaten der BM an der HSO auf einen Blick.">
-  <script>
-    // Design sofort setzen, damit die Seite nicht kurz im falschen Modus aufblitzt
-    try {
-      var t = (JSON.parse(localStorage.getItem("pruefungen:settings")) || {}).theme;
-      if (t === "light" || t === "dark") document.documentElement.dataset.theme = t;
-    } catch (e) {}
-  </script>
+  <meta name="description" content="Inoffizielle Übersicht über Prüfungen, Stundenplan und Fächer der BM-Klasse EFZBMZHH25 an der HSO.">
+  <!-- Sicherheitsrichtlinie: nur eigene Skripte, Daten nur von hier und der Google Calendar API -->
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; connect-src 'self' https://www.googleapis.com; img-src 'self' data:; object-src 'none'; base-uri 'none'; form-action 'none'">
+  <meta name="referrer" content="strict-origin-when-cross-origin">
+  <!-- Design sofort setzen, damit die Seite nicht kurz im falschen Modus aufblitzt -->
+  <script src="theme-init.js"></script>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
@@ -26,7 +24,7 @@
         </button>
         <div>
           <h1>Prüfungen <em>BM</em></h1>
-          <p class="brand__sub">Alle Prüfungsdaten an der HSO auf einen Blick</p>
+          <p class="brand__sub">Klasse EFZBMZHH25 · inoffizielle Übersicht, kein Angebot der HSO</p>
         </div>
       </div>
     </div>
@@ -36,6 +34,9 @@
       <a class="views__tab" href="#faecher" data-view="faecher">Fächer</a>
     </nav>
   </header>
+
+  <!-- Warnung, wenn Daten nicht aktuell sind (wird von app.js gefüllt) -->
+  <div class="wrap"><div id="status" class="status" role="status" hidden></div></div>
 
   <section class="hero" aria-label="Nächste Prüfung" data-panel="pruefungen">
     <div id="hero" class="wrap">
@@ -171,7 +172,9 @@
           <ul>
             <li>Termin im Google-Kalender <b>„Prüfungen BM (von Elias)“</b> erstellen.</li>
             <li>Das <b>Fach</b> im Titel nennen, z. B. „Mathe Prüfung“ oder „T&amp;U Prüfung“.</li>
-            <li>Wörter wie <b>Abgabe</b>, <b>Frist</b>, <b>Nachprüfung</b> oder <b>Kurzprüfung</b> erzeugen ein Zusatz-Label.</li>
+            <li>Wörter wie <b>Abgabe</b>, <b>Frist</b>, <b>Nachprüfung</b>, <b>Kurztest</b> oder <b>Vortrag</b> erzeugen ein Zusatz-Label.</li>
+            <li>Wird das Fach falsch erkannt, in die Beschreibung eine Zeile <b>Fach: Deutsch</b> schreiben (ebenso <b>Typ: Kurztest</b>).</li>
+            <li>Steht nur die Woche fest: ganztägigen Zeitraum eintragen und in die Beschreibung <b>genaue Tage offen</b> schreiben.</li>
             <li><b>Ort</b> (Zimmer) und <b>Beschreibung</b> (z. B. Themen) werden mit angezeigt.</li>
           </ul>
         </details>

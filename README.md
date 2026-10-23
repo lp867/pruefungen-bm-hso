@@ -15,6 +15,7 @@ Bei Fragen oder fehlenden Prüfungen: an Elias wenden.
 | `style.css` | Design (hell/dunkel, Handy) |
 | `app.js` | Lädt den Kalender und stellt ihn dar |
 | `config.js` | Kalender-ID und API-Schlüssel |
+| `theme-init.js` | Setzt Hell/Dunkel vor dem ersten Anzeigen |
 | `data/pruefungen.ics` | Lokale Kopie des Kalenders (Fallback) |
 | `update-kalender.ps1` | Aktualisiert die lokale Kopie |
 | `data/stundenplan.json` | Stundenplan (automatisch erzeugt) |
@@ -37,8 +38,15 @@ nächster Prüfung und einem direkten Link zum Kurs.
 
 ## Tipps für Kalendereinträge
 
-- Das **Fach** wird aus dem Titel erkannt (z. B. „Mathe“, „Französisch“, „T&U“, „VWL“, „IKT“).
-- Wörter wie **Abgabe**, **Frist**, **Nachprüfung** oder **Kurzprüfung** erzeugen ein Zusatz-Label.
+- Das **Fach** wird aus dem Titel erkannt (z. B. „Mathe“, „Französisch“, „T&U“/„T+U“, „VWL“, „IKT“). Vorträge ohne Fach gelten als Geschichte.
+- Wörter wie **Abgabe**, **Frist**, **Nachprüfung**, **Kurztest** oder **Vortrag** erzeugen ein Zusatz-Label.
+- Falsch erkannt? Eine Zeile `Fach: Deutsch` bzw. `Typ: Kurztest` in der Beschreibung übersteuert die Erkennung.
+- Mehrtägige, ganztägige Einträge gelten als **Zeitraum** (z. B. Abgabewoche). Sie verdrängen nicht die nächste Prüfung und erscheinen im Stundenplan als Hinweis für die ganze Woche. Mit „genaue Tage offen“ in der Beschreibung bekommen sie das Label **Datum offen**.
+
+## Wenn Google nicht erreichbar ist
+
+Die Seite zeigt dann oben eine Warnung mit dem Datenstand und verwendet den neueren von zwei Ersatzständen:
+den zuletzt erfolgreich geladenen Stand im Browser oder die Ersatzkopie `data/pruefungen.ics`, die die GitHub Action alle 6 Stunden aktualisiert.
 - **Ort** (Zimmer) und **Beschreibung** (z. B. Themen) werden mit angezeigt.
 
 ## Live-Modus mit API-Schlüssel (empfohlen)
