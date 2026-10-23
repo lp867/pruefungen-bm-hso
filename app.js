@@ -1200,7 +1200,14 @@
       }
     });
     // Beim Scrollen/Verkleinern am Computer schliessen, damit das Feld nicht losgelöst herumsteht
-    window.addEventListener("resize", () => closePopover());
+    // Nur bei geänderter Breite schliessen (Fenster verkleinert, Handy gedreht). Auf dem Handy feuert "resize"
+    // auch, wenn die Adressleiste ein-/ausfährt (nur die Höhe ändert sich), oft genau beim Antippen.
+    let lastWidth = innerWidth;
+    window.addEventListener("resize", () => {
+      if (innerWidth === lastWidth) return;
+      lastWidth = innerWidth;
+      closePopover();
+    });
     window.addEventListener("scroll", () => {
       if (!matchMedia("(max-width: 960px)").matches) closePopover();
     }, { passive: true });
