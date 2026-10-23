@@ -357,12 +357,12 @@
     renderCounts(now);
     renderList(now);
     renderFacts(now);
-    if (view === "stundenplan") renderTimetable(now); // Prüfungen erscheinen auch im Stundenplan
+    if (view !== "pruefungen") renderTimetableViews(now); // Prüfungen erscheinen auch im Stundenplan und bei den Fächern
     renderFooter();
   }
 
   function renderFooter() {
-    $("source").textContent = view === "stundenplan" ? tt.source : state.source;
+    $("source").textContent = view !== "pruefungen" ? tt.source : state.source;
   }
 
   function renderFacts(now) {
@@ -440,9 +440,9 @@
     slidingIndicator(document.querySelector(".views"), ".views__tab[aria-current]", "views__indicator");
   }
 
-  // ---------- Ansichten: Prüfungen | Stundenplan ----------
+  // ---------- Ansichten: Prüfungen | Stundenplan | Fächer ----------
 
-  const VIEWS = ["pruefungen", "stundenplan"];
+  const VIEWS = ["pruefungen", "stundenplan", "faecher"];
   let view = "pruefungen";
 
   function setView(next) {
@@ -459,11 +459,17 @@
       if (a.dataset.view === view) a.setAttribute("aria-current", "page");
       else a.removeAttribute("aria-current");
     });
-    if (view === "stundenplan") {
+    // Stundenplan und Fächer brauchen beide die Stundenplan-Daten
+    if (view !== "pruefungen") {
       if (!tt.loaded) loadTimetable();
-      else renderTimetable(new Date());
+      else renderTimetableViews(new Date());
     }
     renderFooter();
+  }
+
+  function renderTimetableViews(now) {
+    if (view === "stundenplan") renderTimetable(now);
+    if (view === "faecher") renderSubjects(now);
   }
 
   let viewsReady = false; // beim ersten Laden nicht animieren
@@ -476,7 +482,7 @@
 
   // ---------- Stundenplan ----------
 
-  const tt = { lessons: [], loaded: false, offset: 0, source: "" };
+  const tt = { lessons: [], courses: {}, breaks: [], loaded: false, offset: 0, source: "" };
   const WEEKDAYS = ["So", "Mo", "Di", "Mi", "Do", "Fr", "Sa"];
 
   // "2026-10-21T08:30" als lokale Zeit lesen
@@ -493,23 +499,74 @@
       const res = await fetch(CONFIG.timetableUrl || "data/stundenplan.json", { cache: "no-store" });
       if (!res.ok) throw new Error(`Stundenplan nicht gefunden (${res.status})`);
       const data = await res.json();
+      tt.courses = data.courses || {};
       tt.lessons = data.lessons.map((l) => ({
         start: localDate(l.start),
         end: localDate(l.end),
         subject: l.subject,
         room: l.room,
         note: l.note || "",
+        course: l.course || "",
+        url: (tt.courses[l.course] || {}).url || "",
         color: classify(l.subject).subject.hue,
       }));
+      markDeviations(tt.lessons);
+      tt.breaks = findBreaks(tt.lessons);
       tt.loaded = true;
       tt.source = `Stundenplan aus OpenOLAT · zuletzt geändert ${fmt.stamp.format(new Date(data.updated))}`;
-      renderTimetable(new Date());
+      renderTimetableViews(new Date());
       renderFooter();
     } catch (err) {
       console.error(err);
-      $("tt-week").innerHTML = `<div class="error">${esc(err.message)}</div>`;
+      const msg = `<div class="error">${esc(err.message)}</div>`;
+      $("tt-week").innerHTML = msg;
+      $("subject-cards").innerHTML = msg;
     }
   }
+
+  const shortDate = (d) => `${WEEKDAYS[d.getDay()]} ${d.getDate()}.${d.getMonth() + 1}.`;
+  const inDays = (n) => (n === 0 ? "heute" : n === 1 ? "morgen" : n < 14 ? `in ${n} Tagen` : `in ${Math.round(n / 7)} Wochen`);
+
+  // Abweichungen: anderes Zimmer als sonst im selben Zeitfenster (Kurs + Wochentag + Startzeit), online, Samstag
+  function markDeviations(lessons) {
+    const slotKey = (l) => `${l.course || l.subject}|${l.start.getDay()}|${l.start.getHours()}:${l.start.getMinutes()}`;
+    const rooms = new Map();
+    for (const l of lessons) {
+      if (!l.room) continue;
+      const counts = rooms.get(slotKey(l)) || new Map();
+      counts.set(l.room, (counts.get(l.room) || 0) + 1);
+      rooms.set(slotKey(l), counts);
+    }
+    for (const l of lessons) {
+      l.online = /online|zoom/i.test(`${l.room} ${l.subject}`);
+      l.saturday = l.start.getDay() === 6;
+      const counts = rooms.get(slotKey(l));
+      if (!counts || !l.room || l.online) continue;
+      const [usual, n] = [...counts].sort((a, b) => b[1] - a[1])[0];
+      if (n >= 2 && usual !== l.room) l.usualRoom = usual;
+    }
+  }
+
+  // Ferien und freie Tage: Wochentage ohne Lektion zwischen der ersten und letzten Lektion.
+  // Ab 5 Schultagen am Stück gilt es als Ferien, sonst als einzelner freier Tag.
+  function findBreaks(lessons) {
+    if (!lessons.length) return [];
+    const school = new Set(lessons.map((l) => startOfDay(l.start).getTime()));
+    const breaks = [];
+    let run = null;
+    const last = startOfDay(lessons[lessons.length - 1].start);
+    for (let d = startOfDay(lessons[0].start); d <= last; d.setDate(d.getDate() + 1)) {
+      if (d.getDay() === 0 || d.getDay() === 6) continue;
+      if (school.has(d.getTime())) { if (run) breaks.push(run); run = null; continue; }
+      if (!run) run = { from: new Date(d), to: new Date(d), days: 0 };
+      run.to = new Date(d);
+      run.days++;
+    }
+    if (run) breaks.push(run);
+    return breaks.map((b) => ({ ...b, holiday: b.days >= 5 }));
+  }
+
+  const breakOf = (date) => tt.breaks.find((b) => date >= b.from && date <= b.to);
 
   function mondayOf(d) {
     const day = startOfDay(d);
@@ -556,6 +613,7 @@
   function renderTimetable(now) {
     if (!tt.loaded) return;
     renderNow(now);
+    renderHoliday(now);
 
     const monday = shownMonday(now);
     const days = [];
@@ -574,12 +632,16 @@
     friday.setDate(monday.getDate() + 4);
     $("tt-label").innerHTML = `<strong>KW ${isoWeek(monday)}</strong><span>${esc(fmt.dayMonth.format(monday))} – ${esc(fmt.dayMonth.format(friday))} ${friday.getFullYear()}</span>`;
     $("tt-today").hidden = tt.offset === 0;
+    renderNotes(days);
 
     const empty = days.every((d) => !d.lessons.length && !d.exams.length);
     const week = $("tt-week");
     week.style.setProperty("--days", days.length);
     if (empty) {
-      week.innerHTML = `<div class="empty tt-empty">Keine Lektionen in dieser Woche, vielleicht Ferien. 🌿</div>`;
+      const brk = breakOf(monday) || breakOf(friday);
+      week.innerHTML = brk && brk.holiday
+        ? `<div class="empty tt-empty tt-empty--holiday"><strong>Ferien 🌿</strong><span>${esc(shortDate(brk.from))} – ${esc(shortDate(brk.to))}</span></div>`
+        : `<div class="empty tt-empty">Keine Lektionen in dieser Woche.</div>`;
       return;
     }
 
@@ -621,24 +683,126 @@
         const len = (l.end - l.start) / 60000;
         const ex = onLesson.get(l) || [];
         const cls = (l.end <= now ? " tt-lesson--past" : l.start <= now ? " tt-lesson--now" : "") +
-          (len < 60 ? " tt-lesson--short" : "") + (ex.length ? " tt-lesson--exam" : "");
+          (len < 60 ? " tt-lesson--short" : "") + (ex.length ? " tt-lesson--exam" : "") + (l.url ? " tt-lesson--link" : "");
         const examInfo = ex.length
           ? `<span class="tt-lesson__badge">${examLabel(ex[0])}</span><span class="tt-lesson__exam">${esc(ex.map((e) => e.title).join(", "))}</span>`
-          : "";
-        return `<div class="tt-lesson${cls}" style="--h:${l.color};--top:${minutes(l.start) - from};--len:${len}"${ex.length ? ` title="${esc(examLabel(ex[0]) + ": " + ex.map((e) => e.title).join(", "))}"` : ""}>
+          : l.online ? `<span class="tt-lesson__badge tt-lesson__badge--online">Online</span>` : "";
+        const room = [l.room, l.note].filter(Boolean).join(" · ");
+        const tip = [
+          ex.length ? `${examLabel(ex[0])}: ${ex.map((e) => e.title).join(", ")}` : "",
+          l.usualRoom ? `Zimmerwechsel: ${l.room} statt ${l.usualRoom}` : "",
+          l.url ? "Klicken, um den Kurs in OpenOLAT zu öffnen" : "",
+        ].filter(Boolean).join("\n");
+        // Mit Kurslink wird die Lektion zum Link, der den OpenOLAT-Kurs in einem neuen Tab öffnet
+        const tag = l.url ? "a" : "div";
+        const link = l.url ? ` href="${esc(l.url)}" target="_blank" rel="noopener"` : "";
+        return `<${tag} class="tt-lesson${cls}"${link} style="--h:${l.color};--top:${minutes(l.start) - from};--len:${len}"${tip ? ` title="${esc(tip)}"` : ""}>
             <span class="tt-lesson__time">${esc(timeRange(l.start, l.end))}</span>
             <span class="tt-lesson__subject">${esc(l.subject)}</span>
             ${examInfo}
-            ${l.room || l.note ? `<span class="tt-lesson__room">${esc([l.room, l.note].filter(Boolean).join(" · "))}</span>` : ""}
-          </div>`;
+            ${room ? `<span class="tt-lesson__room${l.usualRoom ? " tt-lesson__room--changed" : ""}">${esc(room)}</span>` : ""}
+          </${tag}>`;
       }).join("");
+      const brk = !lessons.length && date.getDay() >= 1 && date.getDay() <= 5 ? breakOf(date) : null;
+      const freeText = brk ? (brk.holiday ? "Ferien 🌿" : "kein Unterricht") : "frei";
       const nowLine = isToday && minutes(now) > from && minutes(now) < to
         ? `<div class="tt-nowline" style="--top:${minutes(now) - from}" title="Jetzt"></div>` : "";
       return `<section class="tt-day${isToday ? " tt-day--today" : ""}">
           <h3 class="tt-day__head"><span class="tt-day__wd">${WEEKDAYS[date.getDay()]}</span><span class="tt-day__date">${date.getDate()}.${date.getMonth() + 1}.</span>${isToday ? `<span class="tt-day__badge">Heute</span>` : ""}</h3>
           <div class="tt-day__exams">${examHtml}</div>
-          <div class="tt-day__body">${hourLines}${lessonHtml || `<p class="tt-free">frei</p>`}${nowLine}</div>
+          <div class="tt-day__body">${hourLines}${lessonHtml || `<p class="tt-free">${freeText}</p>`}${nowLine}</div>
         </section>`;
+    }).join("");
+  }
+
+  // Ferien-Countdown oben im Stundenplan
+  function renderHoliday(now) {
+    const box = $("tt-holiday");
+    const today = startOfDay(now);
+    const current = tt.breaks.find((b) => b.holiday && today >= b.from && today <= b.to);
+    const next = tt.breaks.find((b) => b.holiday && b.from > today);
+    const freeDay = tt.breaks.find((b) => !b.holiday && b.from > today && (!next || b.from < next.from));
+    let html = "";
+    if (current) {
+      html = `<span class="tt-holiday__label">Ferien</span><strong>Schöne Ferien! 🌿</strong><span>noch bis ${esc(shortDate(current.to))}</span>`;
+    } else if (next) {
+      html = `<span class="tt-holiday__label">Nächste Ferien</span><strong>${esc(inDays(dayDiff(now, next.from)))}</strong><span>${esc(shortDate(next.from))} – ${esc(shortDate(next.to))}</span>`;
+    }
+    if (freeDay) {
+      const range = freeDay.days > 1 ? `${shortDate(freeDay.from)} – ${shortDate(freeDay.to)}` : shortDate(freeDay.from);
+      html += `<span class="tt-holiday__free">Vorher frei: ${esc(range)}</span>`;
+    }
+    box.hidden = !html;
+    box.innerHTML = html;
+  }
+
+  // Hinweise zur angezeigten Woche: Zimmerwechsel, online, Samstag, Infotermine, freie Tage
+  function renderNotes(days) {
+    const notes = [];
+    for (const { date, lessons } of days) {
+      const day = shortDate(date);
+      for (const l of lessons) {
+        if (l.usualRoom) notes.push({ type: "room", text: `${day}: ${l.subject} in Zimmer ${l.room} statt ${l.usualRoom}` });
+        if (l.online) notes.push({ type: "online", text: `${day}: ${l.subject} findet online statt` });
+        if (l.note) notes.push({ type: "info", text: `${day}: ${l.subject} (${l.note})` });
+      }
+      if (lessons.some((l) => l.saturday)) notes.push({ type: "sat", text: `${day}: Unterricht am Samstag (${[...new Set(lessons.map((l) => l.subject))].join(", ")})` });
+      const brk = !lessons.length && date.getDay() >= 1 && date.getDay() <= 5 ? breakOf(date) : null;
+      if (brk && !brk.holiday) notes.push({ type: "free", text: `${day}: kein Unterricht` });
+    }
+    const list = $("tt-notes");
+    list.hidden = !notes.length;
+    list.innerHTML = notes.map((n) => `<li class="tt-note tt-note--${n.type}">${esc(n.text)}</li>`).join("");
+  }
+
+  // ---------- Fächer ----------
+
+  // "EFZ BM Finanz- und Rechungswesen Semester 3" -> "Finanz- und Rechnungswesen"
+  function courseName(title) {
+    return title
+      .replace(/^EFZ\s+(BM\s+)?/, "")
+      .replace(/\s+Semester\s+\d+$/, "")
+      .replace(/^SPA\s*-\s*/, "SPA · ")
+      .replace("Rechungswesen", "Rechnungswesen");
+  }
+
+  function renderSubjects(now) {
+    if (!tt.loaded) return;
+    const cards = Object.entries(tt.courses).map(([id, course]) => {
+      const lessons = tt.lessons.filter((l) => l.course === id);
+      const upcoming = lessons.filter((l) => l.end > now);
+      if (!upcoming.length) return null; // Kurs ist vorbei
+      // Prüfungen passen zum Kurs, wenn ihr Fach zu einem der Fächer seiner Lektionen passt
+      const subjects = new Set([course.title, ...lessons.map((l) => l.subject)].map((s) => classify(s).subject.name));
+      subjects.delete(OTHER.name);
+      const exam = state.events.find((e) => e.end > now && e.kind !== "Info" && subjects.has(e.subject.name));
+      return { id, course, next: upcoming[0], remaining: upcoming.length, last: upcoming[upcoming.length - 1], exam };
+    }).filter(Boolean).sort((a, b) => a.next.start - b.next.start);
+
+    const box = $("subject-cards");
+    if (!cards.length) {
+      box.innerHTML = `<div class="empty">Keine laufenden Kurse gefunden.</div>`;
+      return;
+    }
+    box.innerHTML = cards.map(({ course, next, remaining, last, exam }) => {
+      const semester = (course.title.match(/Semester\s+(\d+)/) || [])[1];
+      const running = next.start <= now;
+      return `<article class="subject-card" style="--h:${classify(course.title).subject.hue}">
+          <header class="subject-card__head">
+            <h3>${esc(courseName(course.title))}</h3>
+            ${semester ? `<span class="subject-card__sem">Semester ${semester}</span>` : ""}
+          </header>
+          <dl class="subject-card__facts">
+            <dt>${running ? "Jetzt" : "Nächste Lektion"}</dt>
+            <dd>${esc(running ? `bis ${fmt.time.format(next.end)}` : `${shortDate(next.start)}, ${fmt.time.format(next.start)}`)}${next.room ? ` · ${esc(next.room)}` : ""}
+              ${running ? "" : `<span class="subject-card__muted">${esc(inDays(dayDiff(now, next.start)))}</span>`}</dd>
+            <dt>Noch</dt>
+            <dd>${remaining} ${remaining === 1 ? "Lektion" : "Lektionen"} <span class="subject-card__muted">bis ${esc(shortDate(last.start))}</span></dd>
+            <dt>Prüfung</dt>
+            <dd>${exam ? `<span class="subject-card__exam">${esc(exam.title)} · ${esc(shortDate(exam.start))}</span>` : `<span class="subject-card__muted">keine geplant</span>`}</dd>
+          </dl>
+          <a class="btn subject-card__open" href="${esc(course.url)}" target="_blank" rel="noopener">In OpenOLAT öffnen ↗</a>
+        </article>`;
     }).join("");
   }
 
@@ -826,7 +990,7 @@
   refresh();
   setInterval(() => {                             // "heute/morgen", "Jetzt" & Listen aktuell halten
     render();
-    if (!state.loaded && view === "stundenplan") renderTimetable(new Date());
+    if (!state.loaded && view !== "pruefungen") renderTimetableViews(new Date());
   }, 60 * 1000);
   if (CONFIG.apiKey) setInterval(refresh, 10 * 60 * 1000); // neue Einträge alle 10 Min.
 })();

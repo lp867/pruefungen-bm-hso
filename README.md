@@ -24,6 +24,12 @@ Bei Fragen oder fehlenden Prüfungen: an Elias wenden.
 ## Stundenplan
 
 Der Tab **Stundenplan** zeigt die Lektionen der Klasse wochenweise, inklusive der Prüfungen aus dem Kalender.
+Ein Klick auf eine Lektion öffnet den passenden OpenOLAT-Kurs. Oben stehen ein Ferien-Countdown und Hinweise zur Woche
+(Zimmerwechsel, Online-Lektionen, Samstagsunterricht, freie Tage). Ferien werden aus Lücken im Stundenplan erkannt
+(ab 5 Schultagen ohne Lektion).
+
+Der Tab **Fächer** zeigt alle laufenden OpenOLAT-Kurse mit nächster Lektion, verbleibenden Lektionen bis Semesterende,
+nächster Prüfung und einem direkten Link zum Kurs.
 
 - Quelle ist der OpenOLAT-Kalender. Sein iCal-Link enthält einen persönlichen Schlüssel und ist deshalb **nicht** im Code, sondern als Secret `OLAT_ICS_URL` im GitHub-Repository gespeichert (Settings → Secrets and variables → Actions).
 - Die GitHub Action `.github/workflows/stundenplan.yml` holt den Stundenplan alle 6 Stunden, wandelt ihn mit `tools/stundenplan.py` um und speichert `data/stundenplan.json`. Darin stehen nur Datum, Zeit, Fach und Zimmer, keine Namen von Lehrpersonen.

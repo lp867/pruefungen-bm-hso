@@ -33,6 +33,7 @@
     <nav class="wrap views" aria-label="Ansicht">
       <a class="views__tab" href="#pruefungen" data-view="pruefungen">Prüfungen</a>
       <a class="views__tab" href="#stundenplan" data-view="stundenplan">Stundenplan</a>
+      <a class="views__tab" href="#faecher" data-view="faecher">Fächer</a>
     </nav>
   </header>
 
@@ -61,14 +62,27 @@
 
   <!-- Stundenplan (Daten: data/stundenplan.json, automatisch aus OpenOLAT erzeugt) -->
   <main class="wrap timetable" data-panel="stundenplan" hidden>
-    <div id="tt-now" class="tt-now"></div>
+    <div class="tt-top">
+      <div id="tt-now" class="tt-now"></div>
+      <div id="tt-holiday" class="tt-holiday" hidden></div>
+    </div>
     <div class="tt-nav">
       <button id="tt-prev" class="tt-nav__btn" type="button" aria-label="Vorherige Woche">‹</button>
       <div class="tt-nav__label" id="tt-label" aria-live="polite"></div>
       <button id="tt-next" class="tt-nav__btn" type="button" aria-label="Nächste Woche">›</button>
       <button id="tt-today" class="btn tt-nav__today" type="button">Heute</button>
     </div>
+    <ul id="tt-notes" class="tt-notes" aria-label="Hinweise diese Woche" hidden></ul>
     <div id="tt-week" class="tt-week"></div>
+  </main>
+
+  <!-- Fächer: alle OpenOLAT-Kurse des Semesters mit nächster Lektion, Restlektionen und nächster Prüfung -->
+  <main class="wrap subjects" data-panel="faecher" hidden>
+    <div class="subjects__head">
+      <h2>Fächer</h2>
+      <p>Alle Kurse dieses Semesters. Ein Klick öffnet den Kurs direkt in OpenOLAT.</p>
+    </div>
+    <div id="subject-cards" class="subject-cards"></div>
   </main>
 
   <footer class="wrap foot">

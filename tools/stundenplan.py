@@ -2,7 +2,8 @@
 
 Der iCal-Link enthält einen persönlichen Zugangsschlüssel und wird deshalb nie veröffentlicht:
 er kommt aus der Umgebungsvariable OLAT_ICS_URL (auf GitHub als Secret gespeichert).
-In die JSON-Datei kommen nur Datum, Zeit, Fach und Zimmer, keine Namen von Lehrpersonen.
+In die JSON-Datei kommen nur Datum, Zeit, Fach, Zimmer sowie Kursname und Kurslink (Login nötig),
+keine Namen von Lehrpersonen.
 
 Aufruf:  OLAT_ICS_URL=... python tools/stundenplan.py [ziel.json]
          python tools/stundenplan.py --file stundenplan.ics [ziel.json]
@@ -60,8 +61,23 @@ def subject_of(description, summary):
     return (m.group(1) if m else "Unterricht"), ""
 
 
+def course_of(cur):
+    """Kurs-ID, Kursname und Link zum OpenOLAT-Kurs (ohne Lehrperson)."""
+    url = cur.get("url", "")
+    m = re.search(r"/RepositoryEntry/(\d+)", url)
+    if not m:
+        return None, None
+    # X-OLAT-LINK: RepositoryEntry§<url>§<Kursname>§<url>§<icon>
+    parts = cur.get("olat_link", "").split("§")
+    title = parts[2] if len(parts) > 2 else ""
+    if not title:  # Fallback: "EFZ BM Deutsch Semester 2 - Name (…)" -> Teil vor " - "
+        title = cur.get("summary", "").split(" - ")[0]
+    return m.group(1), {"title": title.strip(), "url": url}
+
+
 def convert(ics_text):
     lessons = []
+    courses = {}
     cur = None
     for line in unfold(ics_text):
         if line == "BEGIN:VEVENT":
@@ -78,6 +94,10 @@ def convert(ics_text):
                 }
                 if note:
                     lesson["note"] = note
+                course_id, course = course_of(cur)
+                if course_id:
+                    lesson["course"] = course_id
+                    courses[course_id] = course
                 lessons.append(lesson)
             cur = None
             continue
@@ -95,13 +115,19 @@ def convert(ics_text):
             cur["description"] = unescape(value)
         elif name == "LOCATION":
             cur["location"] = unescape(value)
+        elif name == "URL":
+            cur["url"] = value.strip()
+        elif name == "X-OLAT-LINK":
+            cur["olat_link"] = unescape(value)
         elif name == "STATUS" and value == "CANCELLED":
             cur["start"] = None
 
     cutoff = (datetime.now() - timedelta(days=KEEP_PAST_DAYS)).strftime("%Y-%m-%dT00:00")
     lessons = [l for l in lessons if l["start"] >= cutoff]
     lessons.sort(key=lambda l: (l["start"], l["subject"]))
-    return lessons
+    used = {l["course"] for l in lessons if "course" in l}
+    courses = {cid: c for cid, c in sorted(courses.items()) if cid in used}
+    return lessons, courses
 
 
 def main(argv):
@@ -117,20 +143,21 @@ def main(argv):
         text = fetch(url)
 
     target = args[0] if args else os.path.join(os.path.dirname(__file__), "..", "data", "stundenplan.json")
-    lessons = convert(text)
+    lessons, courses = convert(text)
     if not lessons:
         sys.exit("Keine Lektionen gefunden, Datei bleibt unverändert.")
 
     # Nur schreiben, wenn sich der Stundenplan wirklich geändert hat (vermeidet leere Commits)
     try:
         with open(target, encoding="utf-8") as f:
-            if json.load(f).get("lessons") == lessons:
+            old = json.load(f)
+            if old.get("lessons") == lessons and old.get("courses") == courses:
                 print(f"Stundenplan unverändert ({len(lessons)} Lektionen).")
                 return
     except (OSError, ValueError):
         pass
 
-    data = {"updated": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"), "lessons": lessons}
+    data = {"updated": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"), "courses": courses, "lessons": lessons}
     os.makedirs(os.path.dirname(os.path.abspath(target)), exist_ok=True)
     with open(target, "w", encoding="utf-8") as f:
         json.dump(data, f, ensure_ascii=False, separators=(",", ":"))

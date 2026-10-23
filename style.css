@@ -424,11 +424,18 @@ html { scrollbar-gutter: stable; }
 .tt-lesson__subject { font-size: 13px; font-weight: 700; hyphens: auto; overflow-wrap: break-word; }
 .tt-lesson__room { color: var(--muted); font-size: 11px; }
 /* Kurze Lektionen (45 Min.): Zeit und Zimmer in einer Zeile, Fach darunter */
-.tt-lesson--short { flex-direction: row; flex-wrap: wrap; align-content: flex-start; column-gap: 4px; padding-top: 4px; padding-bottom: 4px; }
-.tt-lesson--short .tt-lesson__room { order: 1; }
+/* Kurze Lektionen (45 Min.): Fach oben, darunter Zeit und Zimmer in einer Zeile (Zimmer wird bei Platzmangel gekürzt) */
+.tt-lesson--short {
+  display: grid; grid-template-columns: auto minmax(0, 1fr); align-content: start;
+  column-gap: 5px; padding-top: 4px; padding-bottom: 4px;
+}
+.tt-lesson--short .tt-lesson__subject, .tt-lesson--short .tt-lesson__exam { grid-column: 1 / -1; }
+.tt-lesson--short .tt-lesson__subject { grid-row: 1; }
+.tt-lesson--short .tt-lesson__time { grid-row: 2; grid-column: 1; }
+.tt-lesson--short .tt-lesson__room { grid-row: 2; grid-column: 2; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
 .tt-lesson--short .tt-lesson__room::before { content: "· "; }
-.tt-lesson--short .tt-lesson__subject { order: 2; flex-basis: 100%; }
-.tt-lesson--short .tt-lesson__exam { order: 3; }
+.tt-lesson--short .tt-lesson__room--changed::before { content: "· ↻ "; }
+.tt-lesson--short .tt-lesson__room--changed::after { content: none; }
 .tt-lesson--past { opacity: .5; }
 .tt-lesson--now { background: var(--accent-soft); box-shadow: inset 0 0 0 1px var(--accent); }
 
@@ -473,7 +480,76 @@ html { scrollbar-gutter: stable; }
   }
   .tt-lesson__time { grid-row: 1 / span 3; padding-top: 2px; }
   .tt-lesson--short .tt-lesson__room::before { content: none; }
-  .tt-lesson--short .tt-lesson__subject, .tt-lesson--short .tt-lesson__room, .tt-lesson--short .tt-lesson__exam { order: 0; }
+  .tt-lesson--short .tt-lesson__room--changed::after { content: " ↻"; }
+  .tt-lesson--short .tt-lesson__subject, .tt-lesson--short .tt-lesson__room, .tt-lesson--short .tt-lesson__exam { grid-column: 2; grid-row: auto; white-space: normal; }
+  .tt-lesson--short .tt-lesson__time { grid-column: 1; grid-row: 1 / span 3; }
+}
+
+/* Oben im Stundenplan: "Jetzt" und Ferien-Countdown nebeneinander */
+.tt-top { display: flex; gap: 10px; align-items: stretch; }
+.tt-top .tt-now { flex: 1 1 auto; }
+.tt-holiday {
+  flex: 0 0 240px; display: flex; flex-direction: column; justify-content: center; gap: 1px;
+  padding: 12px 16px; border-radius: var(--radius); border: 1px solid var(--line); background: var(--surface);
+}
+.tt-holiday[hidden] { display: none; }
+.tt-holiday__label { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .1em; color: var(--accent-strong); }
+.tt-holiday strong { font-size: 18px; font-weight: 600; }
+.tt-holiday span:not(.tt-holiday__label) { color: var(--muted); font-size: 13px; font-weight: 500; }
+.tt-holiday .tt-holiday__free { margin-top: 4px; font-size: 12px; }
+
+/* Hinweise zur Woche */
+.tt-notes { display: flex; flex-wrap: wrap; gap: 6px; margin: 0 0 10px; padding: 0; list-style: none; }
+.tt-notes[hidden] { display: none; }
+.tt-note {
+  display: inline-flex; align-items: center; gap: 6px; padding: 4px 10px; border-radius: var(--pill);
+  background: var(--surface-2); color: var(--text); font-size: 12px; font-weight: 500;
+}
+.tt-note::before { font-size: 12px; }
+.tt-note--room { background: var(--warn-bg); color: var(--warn-text); }
+.tt-note--room::before { content: "↻"; }
+.tt-note--online { background: var(--accent-soft); color: var(--accent-strong); }
+.tt-note--online::before { content: "◉"; }
+.tt-note--sat::before { content: "📅"; }
+.tt-note--info::before { content: "ℹ"; }
+.tt-note--free::before { content: "🌿"; }
+
+/* Lektionen mit Kurslink: klickbar, öffnen den OpenOLAT-Kurs */
+a.tt-lesson { color: inherit; text-decoration: none; cursor: pointer; transition: box-shadow .15s ease, transform .15s ease; }
+a.tt-lesson:hover { box-shadow: 0 2px 10px rgba(40, 60, 55, .14); transform: translateY(-1px); z-index: 4; }
+a.tt-lesson:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; z-index: 4; }
+.tt-lesson__room--changed { color: var(--warn-text); font-weight: 700; }
+.tt-lesson__room--changed::after { content: " ↻"; }
+.tt-lesson__badge--online { background: var(--accent); color: var(--on-accent); }
+
+.tt-empty--holiday { display: flex; flex-direction: column; gap: 2px; color: var(--text); }
+.tt-empty--holiday strong { font-size: 18px; font-weight: 600; }
+.tt-empty--holiday span { color: var(--muted); }
+
+/* Fächer */
+.subjects { padding-top: 24px; max-width: 1100px; }
+.subjects__head h2 { margin: 0; font-size: 22px; font-weight: 600; }
+.subjects__head p { margin: 4px 0 16px; color: var(--muted); font-size: 14px; }
+.subject-cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); gap: 12px; }
+.subject-card {
+  --h: 0;
+  display: flex; flex-direction: column; gap: 12px; padding: 16px;
+  border: 1px solid var(--line); border-top: 3px solid hsl(var(--h) 50% 55%); border-radius: var(--radius);
+  background: var(--surface);
+}
+.subject-card__head { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; }
+.subject-card__head h3 { margin: 0; font-size: 16px; font-weight: 700; line-height: 1.3; hyphens: auto; overflow-wrap: break-word; }
+.subject-card__sem { flex: none; color: var(--muted); font-size: 11px; font-weight: 600; }
+.subject-card__facts { display: grid; grid-template-columns: auto 1fr; gap: 6px 12px; margin: 0; font-size: 13px; }
+.subject-card__facts dt { color: var(--muted); font-weight: 500; }
+.subject-card__facts dd { margin: 0; font-weight: 600; }
+.subject-card__muted { display: block; color: var(--muted); font-size: 12px; font-weight: 500; }
+.subject-card__exam { color: var(--warn-text); }
+.subject-card__open { margin-top: auto; align-self: flex-start; height: 34px; padding: 0 14px; font-size: 13px; }
+
+@media (max-width: 600px) {
+  .tt-top { flex-direction: column; }
+  .tt-holiday { flex-basis: auto; }
 }
 
 .foot { color: var(--muted); font-size: 12px; padding-top: 48px; padding-bottom: 32px; }
